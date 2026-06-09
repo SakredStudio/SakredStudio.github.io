@@ -1,0 +1,1340 @@
+/**
+ * FanDrop — K-Pop Fan Super App
+ * Expo SDK 54 · React Native · AsyncStorage · Anthropic Claude API
+ * Monetization: Affiliate links — tickets, merch, fashion
+ *
+ * File: App.tsx (project root)
+ */
+
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import {
+  View, Text, ScrollView, TouchableOpacity, TextInput,
+  StyleSheet, Platform, KeyboardAvoidingView, Linking,
+  FlatList, Dimensions, Alert,
+} from 'react-native';
+import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFonts } from 'expo-font';
+import { Syne_700Bold, Syne_800ExtraBold, Syne_900Black } from '@expo-google-fonts/syne';
+import { DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold } from '@expo-google-fonts/dm-sans';
+import { SpaceMono_400Regular, SpaceMono_700Bold } from '@expo-google-fonts/space-mono';
+import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
+import { LinearGradient } from 'expo-linear-gradient';
+
+SplashScreen.preventAutoHideAsync();
+
+const { width: SW } = Dimensions.get('window');
+
+// ─── TYPES ──────────────────────────────────────────────────────────────────
+interface Idol { id:string; name:string; emoji:string; color:string; era:string; fandom:string; members:string[] }
+interface FanEvent { id:number; artist:string; tour:string; date:string; venue:string; country:string; price:string; idol:string; ticketUrl:string }
+interface Drop { artist:string; title:string; type:string; date:string; daysAgo:number; views:string; idol:string|null; ytUrl:string|null }
+interface WishItem { name:string; store:string; price:string; url:string; cat:string }
+interface ChatMsg { role:'user'|'assistant'; content:string }
+interface StyleItem { cat:string; name:string; store:string; price:string; budget:string; url:string; why:string }
+interface StyleResult { look:string; vibe:string; items:StyleItem[] }
+
+interface AppStore {
+  myIdols: string[]; savedEvent: number|null;
+  checkedItems: Record<string,boolean>; wishlist: WishItem[];
+  hasOnboarded: boolean;
+}
+
+// ─── THEME ───────────────────────────────────────────────────────────────────
+const T = {
+  bg: '#06040e', card: 'rgba(255,255,255,0.055)', border: 'rgba(255,255,255,0.09)',
+  t1: '#f0eaff', t2: 'rgba(255,255,255,0.45)', t3: 'rgba(255,255,255,0.22)',
+  t4: 'rgba(255,255,255,0.08)',
+  h: 'Syne_900Black', hb: 'Syne_800ExtraBold',
+  body: 'DMSans_400Regular', bodyM: 'DMSans_500Medium', bodySB: 'DMSans_600SemiBold',
+  mono: 'SpaceMono_400Regular', monoB: 'SpaceMono_700Bold',
+};
+
+// ─── DATA ────────────────────────────────────────────────────────────────────
+const IDOLS: Idol[] = [
+  {id:'bts',name:'BTS',emoji:'💜',color:'#7c3aed',era:'Grand Chapter',fandom:'ARMY',members:['Jin','Suga','J-Hope','RM','Jimin','V','Jungkook']},
+  {id:'bp',name:'BLACKPINK',emoji:'🌸',color:'#ec4899',era:'BORN PINK',fandom:'BLINK',members:['Jisoo','Jennie','Rosé','Lisa']},
+  {id:'skz',name:'Stray Kids',emoji:'⚡',color:'#f97316',era:'DOMINATE',fandom:'STAY',members:['Chan','Lee Know','Changbin','Hyunjin','Han','Felix','Seungmin','I.N']},
+  {id:'aespa',name:'aespa',emoji:'❄️',color:'#a78bfa',era:'Armageddon',fandom:'MY',members:['Karina','Giselle','Winter','NingNing']},
+  {id:'svt',name:'SEVENTEEN',emoji:'💎',color:'#34d399',era:'SPILL THE FEELS',fandom:'CARAT',members:['S.Coups','Jeonghan','Joshua','Jun','Hoshi','Wonwoo','Woozi','DK','Mingyu','The8','Seungkwan','Vernon','Dino']},
+  {id:'nj',name:'NewJeans',emoji:'🐰',color:'#60a5fa',era:'How Sweet',fandom:'Bunnies',members:['Minji','Hanni','Danielle','Haerin','Hyein']},
+  {id:'ive',name:'IVE',emoji:'🌊',color:'#fb7185',era:'WAVE',fandom:'DIVE',members:['Gaeul','Yujin','Rei','Wonyoung','Liz','Leeseo']},
+  {id:'twice',name:'TWICE',emoji:'💋',color:'#f43f5e',era:'Ready to Be',fandom:'ONCE',members:['Nayeon','Jeongyeon','Momo','Sana','Jihyo','Mina','Dahyun','Chaeyoung','Tzuyu']},
+];
+
+const EVENTS: FanEvent[] = [
+  {id:1,artist:'BTS',tour:'Grand Chapter World Tour',date:'2026-10-11',venue:'Rose Bowl, Pasadena',country:'🇺🇸',price:'From $198',idol:'bts',ticketUrl:'https://seatgeek.com'},
+  {id:2,artist:'BLACKPINK',tour:'BORN PINK Encore',date:'2026-09-05',venue:'Madison Square Garden, NYC',country:'🇺🇸',price:'From $124',idol:'bp',ticketUrl:'https://ticketmaster.com'},
+  {id:3,artist:'Stray Kids',tour:'DOMINATE World Tour',date:'2026-08-14',venue:'SoFi Stadium, LA',country:'🇺🇸',price:'From $89',idol:'skz',ticketUrl:'https://seatgeek.com'},
+  {id:4,artist:'aespa',tour:'SYNK: PARALLEL LINE',date:'2026-07-19',venue:'The Forum, Inglewood',country:'🇺🇸',price:'From $75',idol:'aespa',ticketUrl:'https://ticketmaster.com'},
+  {id:5,artist:'SEVENTEEN',tour:'RIGHT HERE World Tour',date:'2026-08-30',venue:'Allegiant Stadium, Las Vegas',country:'🇺🇸',price:'From $79',idol:'svt',ticketUrl:'https://seatgeek.com'},
+  {id:6,artist:'NewJeans',tour:'BUNNIES CAMP 2026',date:'2026-11-01',venue:'United Center, Chicago',country:'🇺🇸',price:'From $88',idol:'nj',ticketUrl:'https://interpark.com'},
+];
+
+const DROPS: Drop[] = [
+  {artist:'BLACKPINK',title:'PINK VENOM REBIRTH',type:'Single',date:'Apr 15',daysAgo:13,views:'48.2M',idol:'bp',ytUrl:'https://youtube.com/results?search_query=BLACKPINK+PINK+VENOM+REBIRTH'},
+  {artist:'Stray Kids',title:'DOMINATE',type:'Album',date:'Apr 20',daysAgo:8,views:'31.7M',idol:'skz',ytUrl:'https://youtube.com/results?search_query=Stray+Kids+DOMINATE'},
+  {artist:'aespa',title:'Supernova II',type:'MV',date:'Apr 22',daysAgo:6,views:'24.5M',idol:'aespa',ytUrl:'https://youtube.com/results?search_query=aespa+Supernova+II+MV'},
+  {artist:'IVE',title:'WAVE',type:'Single',date:'Apr 25',daysAgo:3,views:'18.9M',idol:'ive',ytUrl:'https://youtube.com/results?search_query=IVE+WAVE+MV'},
+  {artist:'KISS OF LIFE',title:'MIDAS TOUCH',type:'Album',date:'Apr 28',daysAgo:0,views:'NEW 🔴',idol:null,ytUrl:'https://youtube.com/results?search_query=KISS+OF+LIFE+MIDAS+TOUCH'},
+  {artist:'NewJeans',title:'Supernatural Pt.2',type:'Single',date:'May 5',daysAgo:-7,views:'UPCOMING',idol:'nj',ytUrl:null},
+  {artist:'TWS',title:'Golden Hour',type:'Mini Album',date:'May 12',daysAgo:-14,views:'UPCOMING',idol:null,ytUrl:null},
+];
+
+const FANCHANTS = [
+  {song:'Dynamite',artist:'BTS',idol:'bts',
+    guide:'During the chorus, shout member names in order: Jin · Suga · J-Hope · RM · Jimin · V · Jungkook on the da-da-da-da break.',
+    lines:[{lyric:"'Cause I, I, I'm in the stars tonight",chant:'[clap clap]',note:'Double clap on downbeat'},{lyric:'So watch me bring the fire',chant:'JIN! SUGA! J-HOPE! RM!',note:'One name per beat'},{lyric:'Shining through the city',chant:'JIMIN! V! JUNGKOOK!',note:'End strong'}],
+    ytUrl:'https://youtube.com/results?search_query=BTS+Dynamite+fanchant+guide'},
+  {song:'How You Like That',artist:'BLACKPINK',idol:'bp',
+    guide:"Shout 'BLACKPINK!' before the first beat drops. During chorus chant 'JISOO! JENNIE! ROSÉ! LISA!' in rapid succession.",
+    lines:[{lyric:'Look at you, now look at me',chant:'BLACKPINK!',note:'Before the drop'},{lyric:'How you like that? How you like that?',chant:'JISOO! JENNIE!',note:'Sharp, punchy'},{lyric:'How you like that?',chant:'ROSÉ! LISA!',note:'Finish the quad'}],
+    ytUrl:'https://youtube.com/results?search_query=BLACKPINK+How+You+Like+That+fanchant'},
+  {song:'MIROH',artist:'Stray Kids',idol:'skz',
+    guide:'Fast and intense. Shout all 8 members during the rap break. Crowd goes silent on the bridge.',
+    lines:[{lyric:'We go! Miroh!',chant:'[stomp stomp clap]',note:'Match the stomp'},{lyric:'[rap break]',chant:'CHAN! LEE KNOW! CHANGBIN! HYUNJIN!',note:'Loud and fast'},{lyric:'[continues]',chant:'HAN! FELIX! SEUNGMIN! I.N!',note:'Equal energy'}],
+    ytUrl:'https://youtube.com/results?search_query=Stray+Kids+MIROH+fanchant'},
+  {song:'FANCY',artist:'TWICE',idol:'twice',
+    guide:'ONCE fans chant all 9 names. The chorus chant is iconic — practice slowly first.',
+    lines:[{lyric:'I just wanna make you fancy',chant:'NAYEON! JEONGYEON! MOMO!',note:'3 names, 3 beats'},{lyric:'Make you fancy me',chant:'SANA! JIHYO! MINA!',note:'Smooth and clear'},{lyric:'Fancy you, fancy you',chant:'DAHYUN! CHAEYOUNG! TZUYU!',note:'End triumphant'}],
+    ytUrl:'https://youtube.com/results?search_query=TWICE+FANCY+fanchant'},
+];
+
+const MERCH_SHOPS = [
+  {name:'Weverse Shop',tag:'Official',desc:'Direct from labels. Albums, lightsticks, photo books.',color:'#7c3aed',price:'$15–$120',url:'https://weverse.io'},
+  {name:'YesStyle',tag:'Best Value',desc:'K-fashion + K-pop. Often cheaper than Weverse.',color:'#22d3ee',price:'$12–$80',url:'https://yesstyle.com'},
+  {name:'Ktown4u',tag:'Pre-Orders',desc:'Pre-orders with POB benefits, group orders.',color:'#34d399',price:'$15–$60',url:'https://ktown4u.com'},
+  {name:'Cokodive',tag:'Budget',desc:'Frequent sales, bundle deals for budget collectors.',color:'#f59e0b',price:'$10–$45',url:'https://cokodive.com'},
+  {name:'Pocamarket',tag:'Photocards',desc:'Biggest photocard marketplace. Buyer protection.',color:'#f43f5e',price:'$2–$50+',url:'https://pocamarket.com'},
+];
+
+const BUDGET_TIPS = [
+  {icon:'💿',tip:'Buy albums without photocards',detail:'Fans sell albums for $5–8 after keeping the PC. Search #albumsale on Instagram.',save:'Save 60–80%'},
+  {icon:'⏳',tip:'Wait 3–4 weeks after release',detail:'PC prices spike on release day then crash. A $40 card often becomes $12 in a month.',save:'Save 50–70% on PCs'},
+  {icon:'👥',tip:'Join group orders (GOs)',detail:'Pool orders to split international shipping. Find GOs on r/kpop, Twitter, or Discord.',save:'Save $15–30/order'},
+  {icon:'📦',tip:'Pre-order for POB benefits',detail:'Pre-ordering unlocks exclusive photocards that sell for 3–5x more later.',save:'Get $15–40 extras free'},
+  {icon:'💡',tip:'Lightstick alternatives',detail:"Phone flashlight works fine at concerts. Or buy the previous gen stick for 50% less on Mercari.",save:'Save $30–60'},
+];
+
+const CONCERT_KIT = [
+  {phase:'30 Days Before',color:'#a78bfa',icon:'📅',items:[
+    {t:'Secure your ticket',aff:true,url:'https://seatgeek.com',tag:'SeatGeek'},
+    {t:'Order official lightstick (2–3 wk shipping from Korea)',aff:true,url:'https://weverse.io',tag:'Weverse'},
+    {t:'Join official fan club for presale access next time',aff:false},
+    {t:'Start planning your concert outfit',aff:false},
+  ]},
+  {phase:'14 Days Before',color:'#f97316',icon:'👗',items:[
+    {t:'Order outfit pieces',aff:true,url:'https://yesstyle.com',tag:'YesStyle'},
+    {t:'Learn fanchants for the top 3 songs',aff:false},
+    {t:'Download Weverse — artists post updates here',aff:false},
+    {t:'Check venue bag policy (clear bags usually required)',aff:false},
+  ]},
+  {phase:'3 Days Before',color:'#22d3ee',icon:'✅',items:[
+    {t:'Practice fanchants one final time',aff:false},
+    {t:'Screenshot your ticket QR — no signal at venues',aff:false},
+    {t:'Prepare fan banner or slogan if making one',aff:false},
+    {t:'Check weather, plan layers',aff:false},
+  ]},
+  {phase:'Day Of Concert',color:'#22c55e',icon:'🎤',items:[
+    {t:'Arrive 90 min early for lightstick Bluetooth sync',aff:false},
+    {t:'Grab fan-made slogans outside venue (usually free!)',aff:false},
+    {t:'Check Weverse for last-minute artist posts',aff:false},
+    {t:'Charge phone 100% — backup lightstick',aff:false},
+  ]},
+];
+
+const GLOSSARY = [
+  {t:'Bias',d:'Your absolute favourite member of a group. Your #1.'},
+  {t:'Bias Wrecker',d:'A member who keeps threatening to become your new #1.'},
+  {t:'Comeback',d:'When a group releases new music after a break. Always a major event.'},
+  {t:'Fanchant',d:'Scripted fan cheers tied to specific song moments. The whole crowd chants in unison.'},
+  {t:'Stan',d:"An intensely dedicated fan. Also used as a verb: 'I stan BTS.'"},
+  {t:'Multistan',d:'A fan who actively follows multiple groups at once.'},
+  {t:'OT (n)',d:"'One True (n) members.' OT7 = you stan all 7 BTS members equally."},
+  {t:'POB',d:'Pre-Order Benefit. Exclusive extras (photocards, posters) only for pre-orders.'},
+  {t:'Lightstick',d:'Official fandom merchandise — Bluetooth-enabled glowing stick used at concerts. $50–90.'},
+  {t:'MV',d:'Music Video. K-pop MVs are cinematic productions released on YouTube.'},
+  {t:'Weverse',d:"HYBE's fan platform. Artists post here directly. Essential app for fans."},
+  {t:'Daesang',d:"Korea's highest music award. Equivalent of Album/Artist of the Year."},
+  {t:'Hiatus',d:'When an idol takes a break from activities, often for military service.'},
+  {t:'Sasaeng',d:"Extreme invasive fan who violates idols' privacy. Universally condemned."},
+  {t:'Disbandment',d:'When a group officially ends. One of the most dreaded events in fandom.'},
+];
+
+const STYLE_PRESETS = [
+  {label:'Airport OOTD',icon:'✈️',prompt:'K-pop idol airport fashion, oversized blazer, casual luxury streetwear'},
+  {label:'Concert Fan',icon:'🎟',prompt:'K-pop concert fan outfit, lightstick-friendly, comfortable yet stylish'},
+  {label:'Stage Glam',icon:'✨',prompt:'K-pop idol stage performance look, bold, eye-catching, performance ready'},
+  {label:'Soft Girl',icon:'🌸',prompt:'K-pop soft girl aesthetic, pastel tones, feminine, cute everyday look'},
+  {label:'Y2K Kpop',icon:'💿',prompt:'Y2K inspired K-pop fashion, low rise, rhinestones, retro futuristic'},
+  {label:'Dark & Edgy',icon:'🖤',prompt:'Dark K-pop idol aesthetic, all-black, leather, edgy streetwear'},
+];
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+const getIdol = (id: string|null) => IDOLS.find(i => i.id === id);
+
+const getDays = (dateStr: string) => {
+  const [y,m,d] = dateStr.split('-').map(Number);
+  const target = new Date(y, m-1, d);
+  const today = new Date(); today.setHours(0,0,0,0);
+  return Math.ceil((target.getTime()-today.getTime())/86400000);
+};
+
+const openURL = (url: string) => Linking.openURL(url).catch(() => Alert.alert('Could not open link'));
+
+// ─── GLOBAL STORE (AsyncStorage-backed, no extra lib) ──────────────────────
+const STORE_KEY = 'fandrop_v1';
+const defaultState: AppStore = {
+  myIdols:['bts','bp'], savedEvent:null,
+  checkedItems:{}, wishlist:[], hasOnboarded:false,
+};
+let _state = {...defaultState};
+let _listeners: Array<()=>void> = [];
+
+const store = {
+  get: () => _state,
+  set: (update: Partial<AppStore>) => {
+    _state = {..._state, ...update};
+    _listeners.forEach(l=>l());
+    AsyncStorage.setItem(STORE_KEY, JSON.stringify(_state)).catch(()=>{});
+  },
+  sub: (fn: ()=>void) => { _listeners.push(fn); return ()=>{_listeners=_listeners.filter(l=>l!==fn)}; },
+};
+
+AsyncStorage.getItem(STORE_KEY).then(s=>{
+  if(s){ _state={...defaultState,...JSON.parse(s)}; _listeners.forEach(l=>l()); }
+}).catch(()=>{});
+
+function useStore<T>(sel: (s:AppStore)=>T): T {
+  const [v,setV] = useState(()=>sel(store.get()));
+  useEffect(()=>store.sub(()=>setV(sel(store.get()))), []);
+  return v;
+}
+
+// ─── SHARED COMPONENTS ───────────────────────────────────────────────────────
+const Lbl = ({children, color, mb=7}:{children:string;color?:string;mb?:number}) => (
+  <Text style={[sh.lbl, color?{color}:{}, {marginBottom:mb}]}>{children}</Text>
+);
+
+const AffTag = () => (
+  <View style={sh.affWrap}><Text style={sh.affText}>AFFILIATE</Text></View>
+);
+
+const Card = ({children, style}:{children:React.ReactNode; style?:any}) => (
+  <View style={[sh.card, style]}>{children}</View>
+);
+
+const ColorBar = ({color}:{color:string}) => (
+  <View style={{height:2.5, backgroundColor:color}}/>
+);
+
+const IdolChip = ({id}:{id:string}) => {
+  const idol = getIdol(id);
+  if(!idol) return null;
+  return (
+    <View style={[sh.chip, {backgroundColor:idol.color+'22', borderColor:idol.color+'33'}]}>
+      <Text style={[sh.chipText, {color:idol.color}]}>{idol.emoji} {idol.name}</Text>
+    </View>
+  );
+};
+
+const AffBtn = ({url, label, color, style}:{url:string;label:string;color:string;style?:any}) => (
+  <TouchableOpacity onPress={()=>openURL(url)} activeOpacity={0.75} style={style}>
+    <LinearGradient colors={[color, color+'aa']} start={{x:0,y:0}} end={{x:1,y:1}} style={sh.affBtn}>
+      <Text style={sh.affBtnText}>{label}</Text>
+    </LinearGradient>
+  </TouchableOpacity>
+);
+
+// ─── API ─────────────────────────────────────────────────────────────────────
+// ⚠️ For production: replace this URL with your Cloudflare Worker proxy
+// NEVER ship with the API key in the binary for a public release
+const CLAUDE_URL = 'https://api.anthropic.com/v1/messages';
+const API_KEY = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY || '';
+
+async function callClaude(system:string, messages:ChatMsg[], maxTokens=1000): Promise<string> {
+  const res = await fetch(CLAUDE_URL, {
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'x-api-key': API_KEY,
+      'anthropic-version':'2023-06-01',
+    },
+    body:JSON.stringify({model:'claude-sonnet-4-20250514', max_tokens:maxTokens, system, messages}),
+  });
+  if(!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  return data.content?.find((b:any)=>b.type==='text')?.text || '';
+}
+
+// ─── ONBOARDING ──────────────────────────────────────────────────────────────
+function OnboardingScreen() {
+  const myIdols = useStore(s=>s.myIdols);
+
+  return (
+    <LinearGradient colors={['#0d0620','#06040e']} style={{flex:1}}>
+      <SafeAreaView style={{flex:1}}>
+        <ScrollView contentContainerStyle={{padding:24, paddingBottom:48}} showsVerticalScrollIndicator={false}>
+          <View style={{alignItems:'center', marginBottom:36, marginTop:24}}>
+            <Text style={{fontSize:52, marginBottom:14}}>🎶</Text>
+            <Text style={[sh.headXL, {textAlign:'center', marginBottom:8}]}>FanDrop</Text>
+            <Text style={[sh.body, {color:T.t2, textAlign:'center', lineHeight:22}]}>
+              The fan app built for real K-pop fans.{'\n'}Pick your groups to get started.
+            </Text>
+          </View>
+
+          <Lbl>Who do you stan? Pick all that apply</Lbl>
+          <View style={{flexDirection:'row', flexWrap:'wrap', gap:10, marginBottom:32}}>
+            {IDOLS.map(idol=>{
+              const sel = myIdols.includes(idol.id);
+              return (
+                <TouchableOpacity key={idol.id} activeOpacity={0.75}
+                  onPress={()=>store.set({myIdols: sel ? myIdols.filter(x=>x!==idol.id) : [...myIdols,idol.id]})}
+                  style={[sh.idolCard, {width:(SW-58)/2, borderColor: sel?idol.color+'66':T.border, backgroundColor: sel?idol.color+'14':T.card}]}>
+                  <Text style={{fontSize:24, marginBottom:6}}>{idol.emoji}</Text>
+                  <Text style={[sh.bodyBold, {marginBottom:2}]}>{idol.name}</Text>
+                  <Text style={[sh.small, {color:T.t3}]}>{idol.fandom}</Text>
+                  {sel && <View style={{marginTop:8, height:2, backgroundColor:idol.color, borderRadius:1}}/>}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <TouchableOpacity disabled={myIdols.length===0} activeOpacity={0.8}
+            onPress={()=>store.set({hasOnboarded:true})}>
+            <LinearGradient
+              colors={myIdols.length>0 ? ['#7c3aed','#ec4899'] : [T.t4, T.t4]}
+              start={{x:0,y:0}} end={{x:1,y:1}}
+              style={[sh.bigBtn, {opacity: myIdols.length>0?1:0.4}]}>
+              <Text style={sh.bigBtnText}>
+                {myIdols.length>0 ? `Enter FanDrop — ${myIdols.length} group${myIdols.length>1?'s':''} selected` : 'Pick at least one group'}
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={{marginTop:14, alignItems:'center'}} onPress={()=>store.set({hasOnboarded:true, myIdols:['bts','bp','aespa']})}>
+            <Text style={[sh.small, {color:T.t3}]}>Explore without picking →</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
+    </LinearGradient>
+  );
+}
+
+// ─── HOME ─────────────────────────────────────────────────────────────────────
+function HomeScreen({navigation}:any) {
+  const myIdols = useStore(s=>s.myIdols);
+  const savedEvent = useStore(s=>s.savedEvent);
+  const myIdolData = myIdols.map(id=>getIdol(id)).filter(Boolean) as Idol[];
+  const primary = myIdolData[0] || IDOLS[0];
+  const event = savedEvent ? EVENTS.find(e=>e.id===savedEvent) : null;
+  const idol = event ? getIdol(event.idol) : null;
+  const days = event ? getDays(event.date) : null;
+
+  const myDrops = DROPS.filter(d=>myIdols.includes(d.idol||'') || !d.idol).slice(0,6);
+
+  return (
+    <View style={{flex:1, backgroundColor:T.bg}}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{paddingBottom:100}}>
+        {/* Header */}
+        <LinearGradient colors={[primary.color+'22','transparent']} style={sh.homeHero}>
+          <SafeAreaView>
+            <View style={{paddingHorizontal:22, paddingBottom:20}}>
+              <Lbl>Your K-Pop Universe</Lbl>
+              <Text style={[sh.headXL, {marginBottom:6}]}>FanDrop</Text>
+              <Text style={[sh.body, {color:T.t2}]}>Concerts · Drops · Fan Tools · AI Assistant</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginTop:14}}>
+                <View style={{flexDirection:'row', gap:8}}>
+                  {myIdolData.map(idol=>(
+                    <View key={idol.id} style={[sh.chip, {backgroundColor:idol.color+'18', borderColor:idol.color+'28'}]}>
+                      <Text style={{fontSize:14}}>{idol.emoji}</Text>
+                      <Text style={[sh.chipText, {color:idol.color}]}>{idol.name}</Text>
+                    </View>
+                  ))}
+                  <TouchableOpacity onPress={()=>navigation.navigate('Fan Hub')} style={[sh.chip, {borderColor:T.border}]}>
+                    <Text style={[sh.chipText, {color:T.t3}]}>+ Edit</Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            </View>
+          </SafeAreaView>
+        </LinearGradient>
+
+        {/* Concert countdown */}
+        <View style={{paddingHorizontal:20, marginBottom:18}}>
+          {event && idol ? (
+            <TouchableOpacity activeOpacity={0.85} onPress={()=>navigation.navigate('Events')}>
+              <LinearGradient colors={[idol.color+'22',idol.color+'08']} start={{x:0,y:0}} end={{x:1,y:1}} style={sh.concertCard}>
+                <Lbl color={idol.color} mb={6}>🎟 My Concert · Tap for Kit</Lbl>
+                <View style={{flexDirection:'row', alignItems:'flex-end', gap:10, marginBottom:8}}>
+                  <Text style={[sh.headXL, {fontSize:64, color:idol.color, lineHeight:70}]}>{days}</Text>
+                  <Text style={[sh.body, {color:T.t2, marginBottom:10}]}>days to go</Text>
+                </View>
+                <Text style={[sh.bodyBold, {marginBottom:3, fontSize:15}]}>{event.artist} {idol.emoji}</Text>
+                <Text style={[sh.small, {color:T.t2}]}>{event.venue} {event.country}</Text>
+                {(days||0)<=14 && (
+                  <View style={[sh.urgencyPill, {marginTop:12}]}>
+                    <View style={sh.liveDot}/><Text style={sh.urgencyText}>{days}d — Concert Kit urgent!</Text>
+                  </View>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+          ):(
+            <TouchableOpacity activeOpacity={0.85} onPress={()=>navigation.navigate('Events')}>
+              <Card style={{padding:18, flexDirection:'row', alignItems:'center', gap:14, borderStyle:'dashed', borderColor:'rgba(192,132,252,0.25)'}}>
+                <Text style={{fontSize:30}}>🎟</Text>
+                <View style={{flex:1}}>
+                  <Text style={[sh.bodyBold, {marginBottom:2}]}>Save a Concert → Get Your Prep Kit</Text>
+                  <Text style={[sh.small, {color:T.t3}]}>Checklist, tickets, merch — all in one</Text>
+                </View>
+                <Text style={{fontSize:20, color:T.t4}}>›</Text>
+              </Card>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* My Drops */}
+        <View style={{paddingHorizontal:22, marginBottom:10}}><Lbl>🎵 My Group Drops</Lbl></View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap:10, paddingHorizontal:20, paddingBottom:4}}>
+          {myDrops.map((drop,i)=>{
+            const idol = drop.idol ? getIdol(drop.idol) : null;
+            return (
+              <TouchableOpacity key={i} activeOpacity={0.8} onPress={()=>drop.ytUrl&&openURL(drop.ytUrl)}
+                style={[sh.dropCard, {backgroundColor:idol?idol.color+'14':'rgba(255,255,255,0.05)', borderColor:idol?idol.color+'28':T.border}]}>
+                <Text style={[sh.smallMono, {color:idol?idol.color:'rgba(255,255,255,0.3)', marginBottom:3}]}>{drop.type.toUpperCase()}</Text>
+                <Text style={[sh.bodyBold, {fontSize:12, lineHeight:16, marginBottom:3}]}>{drop.title}</Text>
+                <Text style={[sh.small, {color:T.t2, marginBottom:7}]}>{drop.artist}</Text>
+                <Text style={[sh.smallMono, {color:drop.daysAgo===0?'#ef4444':drop.daysAgo<0?T.t3:idol?.color||'#22c55e'}]}>
+                  {drop.daysAgo===0?'🔴 TODAY':drop.daysAgo<0?`In ${Math.abs(drop.daysAgo)}d`:`${drop.daysAgo}d ago`}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
+        {/* FANI promo */}
+        <View style={{paddingHorizontal:20, marginTop:18, marginBottom:2}}>
+          <TouchableOpacity activeOpacity={0.85} onPress={()=>navigation.navigate('FANI')}>
+            <Card style={{padding:18, backgroundColor:'rgba(124,58,237,0.1)', borderColor:'rgba(192,132,252,0.2)'}}>
+              <View style={{flexDirection:'row', gap:14, alignItems:'center'}}>
+                <LinearGradient colors={['#7c3aed','#ec4899']} style={sh.faniIconBg}>
+                  <Text style={{fontSize:22}}>🤖</Text>
+                </LinearGradient>
+                <View style={{flex:1}}>
+                  <View style={{flexDirection:'row', alignItems:'center', gap:8, marginBottom:3}}>
+                    <Text style={[sh.bodyBold, {fontSize:14}]}>FANI — AI Fan Assistant</Text>
+                    <View style={{flexDirection:'row', alignItems:'center', gap:4}}>
+                      <View style={sh.liveDot}/><Text style={sh.urgencyText}>LIVE</Text>
+                    </View>
+                  </View>
+                  <Text style={[sh.small, {color:T.t2, lineHeight:18}]}>Ask anything K-pop. Fanchants, merch, concert prep — powered by Claude AI.</Text>
+                </View>
+                <Text style={{fontSize:18, color:T.t4}}>›</Text>
+              </View>
+            </Card>
+          </TouchableOpacity>
+        </View>
+
+        {/* Quick grid */}
+        <View style={{paddingHorizontal:20, marginTop:18}}>
+          <View style={{flexDirection:'row', flexWrap:'wrap', gap:10}}>
+            {[
+              {icon:'🎤',label:'Fanchants',sub:'Learn before the show',nav:'Fan Hub',c:'#7c3aed'},
+              {icon:'📋',label:'Concert Kit',sub:'Full prep checklist',nav:'Events',c:'#f97316'},
+              {icon:'👗',label:'AI Stylist',sub:'Shop your look',nav:'AI Style',c:'#ec4899'},
+              {icon:'💰',label:'Budget Tips',sub:'Fan on a budget',nav:'Fan Hub',c:'#22c55e'},
+              {icon:'📖',label:'K-Pop Glossary',sub:'New fan? Start here',nav:'Fan Hub',c:'#60a5fa'},
+              {icon:'🎵',label:'New Drops',sub:'Latest releases',nav:'Drops',c:'#f43f5e'},
+            ].map((item,i)=>(
+              <TouchableOpacity key={i} activeOpacity={0.8} onPress={()=>navigation.navigate(item.nav)}
+                style={[sh.card, {width:(SW-50)/2, padding:16}]}>
+                <Text style={{fontSize:24, marginBottom:8}}>{item.icon}</Text>
+                <Text style={[sh.bodyBold, {fontSize:13, marginBottom:3}]}>{item.label}</Text>
+                <Text style={[sh.small, {color:T.t3}]}>{item.sub}</Text>
+                <View style={{marginTop:10, width:22, height:2.5, backgroundColor:item.c, borderRadius:2}}/>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+// ─── EVENTS ───────────────────────────────────────────────────────────────────
+function EventsScreen() {
+  const savedEvent = useStore(s=>s.savedEvent);
+  const checkedItems = useStore(s=>s.checkedItems);
+  const event = savedEvent ? EVENTS.find(e=>e.id===savedEvent) : null;
+  const idol = event ? getIdol(event.idol) : null;
+  const days = event ? getDays(event.date) : null;
+
+  const totalChecks = CONCERT_KIT.reduce((a,p)=>a+p.items.length,0);
+  const completedChecks = Object.values(checkedItems).filter(Boolean).length;
+  const progress = totalChecks > 0 ? completedChecks/totalChecks : 0;
+
+  return (
+    <View style={{flex:1, backgroundColor:T.bg}}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{paddingBottom:100}}>
+        <SafeAreaView>
+          <View style={{padding:22, paddingBottom:0}}>
+            <Lbl>Upcoming Shows + Full Kit</Lbl>
+            <Text style={[sh.headL, {marginBottom:4}]}>Concert{'\n'}Planner</Text>
+            <Text style={[sh.body, {color:T.t2, lineHeight:20, marginBottom:20}]}>Pick your concert → get tickets, merch, checklist in one place.</Text>
+
+            {/* Event picker */}
+            {EVENTS.map(ev=>{
+              const evIdol = getIdol(ev.idol);
+              const dy = getDays(ev.date);
+              const sel = savedEvent === ev.id;
+              return (
+                <TouchableOpacity key={ev.id} activeOpacity={0.8}
+                  onPress={()=>store.set({savedEvent:ev.id})}
+                  style={[sh.card, {padding:14, marginBottom:9, borderColor:sel?(evIdol?.color||'#7c3aed')+'55':T.border, backgroundColor:sel?(evIdol?.color||'#7c3aed')+'14':T.card}]}>
+                  <View style={{flexDirection:'row', gap:12, alignItems:'center'}}>
+                    <View style={[sh.idolIconBg, {backgroundColor:(evIdol?.color||'#7c3aed')+'18'}]}>
+                      <Text style={{fontSize:20}}>{evIdol?.emoji||'🎵'}</Text>
+                    </View>
+                    <View style={{flex:1}}>
+                      <Text style={[sh.bodyBold, {marginBottom:2}]}>{ev.artist} {ev.country}</Text>
+                      <Text style={[sh.small, {color:T.t2, marginBottom:6}]} numberOfLines={1}>{ev.venue}</Text>
+                      <View style={{flexDirection:'row', gap:6}}>
+                        <View style={[sh.pill, {backgroundColor:(evIdol?.color||'#7c3aed')+'18'}]}>
+                          <Text style={[sh.pillText, {color:evIdol?.color||'#7c3aed'}]}>{dy}d away</Text>
+                        </View>
+                        <View style={[sh.pill, {backgroundColor:'rgba(34,211,153,0.1)'}]}>
+                          <Text style={[sh.pillText, {color:'#34d399'}]}>{ev.price}</Text>
+                        </View>
+                      </View>
+                    </View>
+                    {sel && <Text style={{fontSize:16, color:evIdol?.color||'#7c3aed'}}>✓</Text>}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </SafeAreaView>
+
+        {/* Concert Kit */}
+        {event && idol && (
+          <View style={{padding:20}}>
+            <Card style={{overflow:'hidden', backgroundColor:(idol.color+'10'), borderColor:idol.color+'28'}}>
+              {/* Header */}
+              <View style={{padding:16, borderBottomWidth:1, borderBottomColor:'rgba(255,255,255,0.06)'}}>
+                <Lbl color={idol.color} mb={4}>🎟 Concert Kit</Lbl>
+                <Text style={[sh.bodyBold, {fontSize:15}]}>{days} days · {event.artist} · {event.venue}</Text>
+              </View>
+
+              {/* Tickets */}
+              <View style={{padding:14, borderBottomWidth:1, borderBottomColor:'rgba(255,255,255,0.06)'}}>
+                <View style={{flexDirection:'row', gap:8, alignItems:'center', marginBottom:10}}>
+                  <Text style={sh.bodyBold}>🎟 Get Tickets</Text><AffTag/>
+                  {(days||0)<=14 && <View style={[sh.pill, {backgroundColor:'rgba(239,68,68,0.14)'}]}>
+                    <Text style={[sh.pillText, {color:'#ef4444'}]}>⚡ {days}d left</Text>
+                  </View>}
+                </View>
+                <View style={{flexDirection:'row', gap:8}}>
+                  <AffBtn url={event.ticketUrl} label={`Buy Tickets ↗ ${event.price}`} color={idol.color} style={{flex:1}}/>
+                  <TouchableOpacity onPress={()=>openURL('https://vividseats.com')} activeOpacity={0.8}
+                    style={[sh.outlineBtn, {borderColor:idol.color+'33', backgroundColor:idol.color+'10'}]}>
+                    <Text style={[sh.outlineBtnText, {color:idol.color}]}>VividSeats</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Merch */}
+              <View style={{padding:14, borderBottomWidth:1, borderBottomColor:'rgba(255,255,255,0.06)'}}>
+                <View style={{flexDirection:'row', gap:8, alignItems:'center', marginBottom:10}}>
+                  <Text style={sh.bodyBold}>🌐 Official Merch</Text><AffTag/>
+                </View>
+                <View style={{flexDirection:'row', gap:8}}>
+                  {['Weverse','Ktown4u'].map(shop=>(
+                    <TouchableOpacity key={shop} onPress={()=>openURL(shop==='Weverse'?'https://weverse.io':'https://ktown4u.com')} activeOpacity={0.8}
+                      style={[sh.outlineBtn, {flex:1, borderColor:T.border}]}>
+                      <Text style={[sh.outlineBtnText, {color:T.t2}]}>{shop} ↗</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Progress + Checklist */}
+              <View style={{padding:14}}>
+                <View style={{flexDirection:'row', justifyContent:'space-between', alignItems:'center', marginBottom:8}}>
+                  <Text style={sh.bodyBold}>📋 Prep Checklist</Text>
+                  <Text style={[sh.smallMono, {color:idol.color}]}>{completedChecks}/{totalChecks} done</Text>
+                </View>
+                <View style={{height:4, backgroundColor:'rgba(255,255,255,0.08)', borderRadius:2, marginBottom:14, overflow:'hidden'}}>
+                  <LinearGradient colors={[idol.color,'#f472b6']} start={{x:0,y:0}} end={{x:1,y:0}} style={{width:`${progress*100}%` as any, height:'100%', borderRadius:2}}/>
+                </View>
+                {CONCERT_KIT.map((phase,pi)=>(
+                  <View key={pi} style={{marginBottom:14}}>
+                    <View style={{flexDirection:'row', gap:7, alignItems:'center', marginBottom:8}}>
+                      <Text style={{fontSize:14}}>{phase.icon}</Text>
+                      <Text style={[sh.smallMono, {color:phase.color}]}>{phase.phase}</Text>
+                    </View>
+                    {phase.items.map((item,ii)=>{
+                      const key=`${pi}-${ii}`, done=!!checkedItems[key];
+                      return (
+                        <TouchableOpacity key={ii} activeOpacity={0.8}
+                          onPress={()=>store.set({checkedItems:{...store.get().checkedItems,[key]:!done}})}
+                          style={{flexDirection:'row', gap:10, alignItems:'flex-start', paddingVertical:7, borderBottomWidth:1, borderBottomColor:'rgba(255,255,255,0.04)'}}>
+                          <View style={{width:22, height:22, borderRadius:7, borderWidth:1.5,
+                            borderColor:done?phase.color:'rgba(255,255,255,0.15)',
+                            backgroundColor:done?phase.color+'22':'transparent',
+                            alignItems:'center', justifyContent:'center', marginTop:1}}>
+                            {done && <Text style={{fontSize:12, color:phase.color}}>✓</Text>}
+                          </View>
+                          <View style={{flex:1}}>
+                            <Text style={[sh.body, {color:done?T.t3:T.t1, textDecorationLine:done?'line-through':'none', lineHeight:18}]}>{item.t}</Text>
+                            {item.aff && (
+                              <TouchableOpacity onPress={()=>openURL(item.url)} style={{marginTop:3}}>
+                                <View style={{flexDirection:'row', gap:4, alignItems:'center'}}>
+                                  <AffTag/>
+                                  <Text style={[sh.smallMono, {color:'#fbbf24'}]}>{item.tag} ↗</Text>
+                                </View>
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                ))}
+              </View>
+            </Card>
+            <Text style={[sh.tiny, {textAlign:'center', marginTop:8}]}>Ticket & merch links are affiliate · Prices may vary · FanDrop earns a commission</Text>
+          </View>
+        )}
+      </ScrollView>
+    </View>
+  );
+}
+
+// ─── DROPS ────────────────────────────────────────────────────────────────────
+function DropsScreen() {
+  return (
+    <View style={{flex:1, backgroundColor:T.bg}}>
+      <FlatList
+        data={DROPS}
+        keyExtractor={(_,i)=>i.toString()}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{paddingBottom:100}}
+        ListHeaderComponent={()=>(
+          <SafeAreaView>
+            <View style={{padding:22, paddingBottom:10}}>
+              <Lbl>April – May 2026</Lbl>
+              <Text style={sh.headL}>New Music{'\n'}Drops</Text>
+            </View>
+          </SafeAreaView>
+        )}
+        renderItem={({item:d})=>{
+          const idol = d.idol ? getIdol(d.idol) : null;
+          return (
+            <View style={{paddingHorizontal:20, marginBottom:11}}>
+              <Card style={{overflow:'hidden'}}>
+                <ColorBar color={idol?.color||'#6b7280'}/>
+                <View style={{padding:14, flexDirection:'row', gap:11, alignItems:'flex-start'}}>
+                  <View style={[sh.dropIconBg, {backgroundColor:(idol?.color||'#6b7280')+'18', borderColor:(idol?.color||'#6b7280')+'28'}]}>
+                    <Text style={{fontSize:18}}>{d.daysAgo<0?'📅':d.daysAgo===0?'🔴':'🎵'}</Text>
+                  </View>
+                  <View style={{flex:1}}>
+                    <View style={{flexDirection:'row', gap:7, alignItems:'center', marginBottom:3, flexWrap:'wrap'}}>
+                      <Text style={sh.bodyBold}>{d.title}</Text>
+                      {d.daysAgo===0 && <View style={[sh.pill,{backgroundColor:'rgba(239,68,68,0.18)'}]}><Text style={[sh.pillText,{color:'#ef4444'}]}>NEW</Text></View>}
+                    </View>
+                    <Text style={[sh.small, {color:T.t2, marginBottom:8}]}>{d.artist} · {d.type} · {d.date}</Text>
+                    <View style={{flexDirection:'row', gap:6, flexWrap:'wrap', alignItems:'center'}}>
+                      {d.daysAgo>=0 && d.ytUrl && (
+                        <TouchableOpacity onPress={()=>openURL(d.ytUrl!)} style={[sh.pill,{backgroundColor:'rgba(239,68,68,0.12)'}]}>
+                          <Text style={[sh.pillText,{color:'#ef4444'}]}>▶ YouTube</Text>
+                        </TouchableOpacity>
+                      )}
+                      {d.daysAgo>=0 && <View style={[sh.pill,{backgroundColor:(idol?.color||'#6b7280')+'14'}]}><Text style={[sh.pillText,{color:idol?.color||T.t3}]}>{d.views}</Text></View>}
+                      {d.daysAgo<0 && <Text style={[sh.small,{color:T.t3}]}>Drops in {Math.abs(d.daysAgo)} days</Text>}
+                      {idol && <IdolChip id={idol.id}/>}
+                    </View>
+                  </View>
+                </View>
+              </Card>
+            </View>
+          );
+        }}
+      />
+    </View>
+  );
+}
+
+// ─── AI STYLE ─────────────────────────────────────────────────────────────────
+function StyleScreen() {
+  const myIdols = useStore(s=>s.myIdols);
+  const wishlist = useStore(s=>s.wishlist);
+  const [styleIdol, setStyleIdol] = useState(myIdols[0]||'bts');
+  const [stylePrompt, setStylePrompt] = useState('');
+  const [activePreset, setActivePreset] = useState<string|null>(null);
+  const [loading, setLoading] = useState(false);
+  const [results, setResults] = useState<StyleResult|null>(null);
+  const [showWish, setShowWish] = useState(false);
+
+  const generate = async () => {
+    if(loading) return;
+    setLoading(true); setResults(null);
+    const idol = getIdol(styleIdol);
+    const prompt = stylePrompt.trim()||`${idol?.name} ${idol?.era} era fan outfit`;
+    try {
+      const raw = await callClaude(
+        `You are a K-pop fashion stylist. Given a style request, return ONLY valid JSON (no markdown) with this exact structure: {"look":"Short look name","vibe":"2-sentence description","items":[{"cat":"Top/Bottom/Shoes/Outer/Bag/Accessory","name":"Specific product name","store":"ASOS or YesStyle or Zara or H&M or Urban Outfitters or Mango","price":"$XX","budget":"Budget dupe store + price","url":"https://[store].com","why":"1 sentence why it fits"}]} Return exactly 5 items.`,
+        [{role:'user', content:`Create a K-pop fan outfit for: ${prompt}`}],
+        1000
+      );
+      const clean = raw.replace(/```json|```/g,'').trim();
+      const match = clean.match(/\{[\s\S]*\}/);
+      if(!match) throw new Error('No JSON');
+      setResults(JSON.parse(match[0]));
+    } catch(e) {
+      Alert.alert('Could not generate', 'Check your API key in .env and try again.');
+    } finally { setLoading(false); }
+  };
+
+  const toggleWish = (item: StyleItem) => {
+    const cur = store.get().wishlist;
+    const has = cur.find(x=>x.name===item.name);
+    store.set({wishlist: has ? cur.filter(x=>x.name!==item.name) : [...cur, {name:item.name,store:item.store,price:item.price,url:item.url,cat:item.cat}]});
+  };
+
+  const DUPE_URLS: Record<string,string> = {
+    shein:'https://shein.com', temu:'https://temu.com', romwe:'https://romwe.com',
+    'h&m':'https://hm.com', asos:'https://asos.com', yesstyle:'https://yesstyle.com',
+    primark:'https://primark.com',
+  };
+
+  return (
+    <View style={{flex:1, backgroundColor:T.bg}}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{paddingBottom:100}}>
+        <SafeAreaView>
+          <View style={{padding:22, paddingBottom:0}}>
+            <Lbl>AI-Powered · Affiliate Commerce</Lbl>
+            <Text style={[sh.headL, {marginBottom:4}]}>AI Style{'\n'}Finder</Text>
+            <Text style={[sh.body, {color:T.t2, lineHeight:20, marginBottom:16}]}>Describe any K-pop look → get shoppable outfit recs with budget dupes.</Text>
+
+            {/* Wishlist bar */}
+            {wishlist.length>0 && (
+              <TouchableOpacity onPress={()=>setShowWish(v=>!v)} activeOpacity={0.8}
+                style={{flexDirection:'row', alignItems:'center', gap:8, padding:11, borderRadius:13, backgroundColor:'rgba(244,63,94,0.1)', borderWidth:1, borderColor:'rgba(244,63,94,0.25)', marginBottom:14}}>
+                <Text style={{fontSize:16}}>❤️</Text>
+                <Text style={[sh.bodyBold, {color:'#f43f5e'}]}>Wishlist ({wishlist.length} items) — tap to view</Text>
+              </TouchableOpacity>
+            )}
+
+            {showWish && (
+              <Card style={{padding:14, marginBottom:14}}>
+                {wishlist.map((item,i)=>(
+                  <View key={i} style={{flexDirection:'row', gap:12, alignItems:'center', paddingVertical:10, borderBottomWidth:i<wishlist.length-1?1:0, borderBottomColor:'rgba(255,255,255,0.06)'}}>
+                    <Text style={{fontSize:20}}>{item.cat==='Top'?'👕':item.cat==='Bottom'?'👖':item.cat==='Shoes'?'👟':item.cat==='Outer'?'🧥':item.cat==='Bag'?'👜':'💍'}</Text>
+                    <View style={{flex:1}}>
+                      <Text style={[sh.bodyBold, {fontSize:12}]}>{item.name}</Text>
+                      <Text style={[sh.small, {color:T.t3}]}>{item.store} · {item.price}</Text>
+                    </View>
+                    <TouchableOpacity onPress={()=>openURL(item.url)} style={[sh.pill,{backgroundColor:'rgba(192,132,252,0.12)'}]}>
+                      <Text style={[sh.pillText,{color:'#c084fc'}]}>Buy ↗</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </Card>
+            )}
+
+            {/* Affiliate notice */}
+            <View style={{padding:10, borderRadius:12, backgroundColor:'rgba(251,191,36,0.06)', borderWidth:1, borderColor:'rgba(251,191,36,0.15)', marginBottom:18, flexDirection:'row', gap:9, alignItems:'center'}}>
+              <Text style={{fontSize:14}}>💸</Text>
+              <Text style={[sh.small, {color:'rgba(251,191,36,0.8)', flex:1, lineHeight:18}]}>Every "Buy ↗" earns FanDrop a commission at no extra cost to you.</Text>
+            </View>
+
+            {/* Idol selector */}
+            <Lbl mb={10}>Base it on a group's style</Lbl>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom:18}}>
+              <View style={{flexDirection:'row', gap:8}}>
+                {IDOLS.slice(0,6).map(idol=>(
+                  <TouchableOpacity key={idol.id} activeOpacity={0.8} onPress={()=>setStyleIdol(idol.id)}
+                    style={[sh.pill, {paddingVertical:7, paddingHorizontal:14, backgroundColor:styleIdol===idol.id?idol.color+'22':'rgba(255,255,255,0.04)', borderColor:styleIdol===idol.id?idol.color+'44':T.border}]}>
+                    <Text style={[sh.pillText, {color:styleIdol===idol.id?idol.color:T.t3}]}>{idol.emoji} {idol.name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+
+            {/* Presets */}
+            <Lbl mb={10}>Quick style presets</Lbl>
+            <View style={{flexDirection:'row', flexWrap:'wrap', gap:8, marginBottom:18}}>
+              {STYLE_PRESETS.map((p,i)=>(
+                <TouchableOpacity key={i} activeOpacity={0.8}
+                  onPress={()=>{setStylePrompt(p.prompt); setActivePreset(p.label);}}
+                  style={[sh.presetCard, {borderColor:activePreset===p.label?'rgba(192,132,252,0.4)':T.border, backgroundColor:activePreset===p.label?'rgba(192,132,252,0.1)':'rgba(255,255,255,0.03)'}]}>
+                  <Text style={{fontSize:20, marginBottom:4}}>{p.icon}</Text>
+                  <Text style={[sh.small, {color:activePreset===p.label?'#c084fc':T.t2, textAlign:'center', fontFamily:T.bodySB}]}>{p.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Custom prompt */}
+            <Lbl mb={8}>Or describe your own look</Lbl>
+            <View style={{borderRadius:14, backgroundColor:'rgba(255,255,255,0.06)', borderWidth:1, borderColor:'rgba(255,255,255,0.1)', padding:12, marginBottom:14}}>
+              <TextInput
+                value={stylePrompt}
+                onChangeText={t=>{setStylePrompt(t); setActivePreset(null);}}
+                placeholder="e.g. BTS Butter era pastel summer look…"
+                placeholderTextColor={T.t3}
+                multiline numberOfLines={2}
+                style={[sh.body, {color:T.t1, lineHeight:22, minHeight:48}]}
+              />
+            </View>
+
+            <TouchableOpacity onPress={generate} disabled={loading} activeOpacity={0.85}>
+              <LinearGradient
+                colors={loading?[T.t4,T.t4]:['#7c3aed','#ec4899']}
+                start={{x:0,y:0}} end={{x:1,y:1}}
+                style={[sh.bigBtn, {flexDirection:'row', gap:10, justifyContent:'center', alignItems:'center'}]}>
+                {loading
+                  ? <><Text style={{color:T.t2}}>Styling your look</Text></>
+                  : <Text style={sh.bigBtnText}>✨ Generate Outfit & Shop Links</Text>
+                }
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+
+        {/* Results */}
+        {results && (
+          <View style={{padding:20}}>
+            <LinearGradient colors={['rgba(124,58,237,0.15)','rgba(236,72,153,0.08)']} style={{borderRadius:18, padding:16, marginBottom:16, borderWidth:1, borderColor:'rgba(192,132,252,0.2)'}}>
+              <Lbl color='#c084fc' mb={6}>✨ Your Generated Look</Lbl>
+              <Text style={[sh.bodyBold, {fontSize:20, marginBottom:6}]}>{results.look}</Text>
+              <Text style={[sh.body, {color:T.t2, lineHeight:20}]}>{results.vibe}</Text>
+            </LinearGradient>
+
+            <View style={{flexDirection:'row', gap:8, alignItems:'center', marginBottom:12}}>
+              <Lbl mb={0}>🛍 Shop the Look</Lbl><AffTag/>
+            </View>
+
+            {(results.items||[]).map((item,i)=>{
+              const inWish = !!wishlist.find(x=>x.name===item.name);
+              const dupeStore = item.budget?.split(' ')[0]?.toLowerCase().replace(/[^a-z&]/g,'');
+              const dupeUrl = DUPE_URLS[dupeStore]||'https://yesstyle.com';
+              return (
+                <Card key={i} style={{overflow:'hidden', marginBottom:10}}>
+                  <ColorBar color='#7c3aed'/>
+                  <View style={{padding:13, flexDirection:'row', gap:11, alignItems:'flex-start'}}>
+                    <View style={[sh.styleItemIcon, {backgroundColor:'rgba(192,132,252,0.1)', borderColor:'rgba(192,132,252,0.18)'}]}>
+                      <Text style={{fontSize:20}}>{item.cat==='Top'?'👕':item.cat==='Bottom'?'👖':item.cat==='Shoes'?'👟':item.cat==='Outer'?'🧥':item.cat==='Bag'?'👜':'💍'}</Text>
+                    </View>
+                    <View style={{flex:1}}>
+                      <Text style={[sh.smallMono, {color:'#a78bfa', marginBottom:2}]}>{item.cat.toUpperCase()}</Text>
+                      <Text style={[sh.bodyBold, {marginBottom:2, lineHeight:18}]}>{item.name}</Text>
+                      <Text style={[sh.small, {color:T.t2, marginBottom:4}]}>{item.store}</Text>
+                      <Text style={[sh.small, {color:T.t2, lineHeight:18, fontStyle:'italic', marginBottom:7}]}>"{item.why}"</Text>
+                      <View style={{flexDirection:'row', gap:8, alignItems:'center'}}>
+                        <Text style={[sh.bodyBold, {fontFamily:T.monoB}]}>{item.price}</Text>
+                        {item.budget && <Text style={[sh.small, {color:'#22c55e', fontFamily:T.mono}]}>💚 {item.budget}</Text>}
+                      </View>
+                    </View>
+                    <TouchableOpacity onPress={()=>toggleWish(item)} style={[sh.wishBtn, {borderColor:inWish?'rgba(244,63,94,0.35)':T.border, backgroundColor:inWish?'rgba(244,63,94,0.12)':T.t4}]}>
+                      <Text style={{fontSize:14}}>{inWish?'❤️':'🤍'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={{paddingHorizontal:13, paddingBottom:12, flexDirection:'row', gap:8}}>
+                    <TouchableOpacity onPress={()=>openURL(item.url)} activeOpacity={0.85} style={{flex:1}}>
+                      <LinearGradient colors={['#7c3aed','#ec4899']} start={{x:0,y:0}} end={{x:1,y:1}} style={sh.affBtn}>
+                        <Text style={sh.affBtnText}>Buy at {item.store} ↗</Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                    {item.budget && (
+                      <TouchableOpacity onPress={()=>openURL(dupeUrl)} activeOpacity={0.8}
+                        style={[sh.outlineBtn, {borderColor:'rgba(34,197,94,0.25)', backgroundColor:'rgba(34,197,94,0.08)', paddingHorizontal:13}]}>
+                        <Text style={[sh.outlineBtnText, {color:'#22c55e'}]}>💚 Dupe</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </Card>
+              );
+            })}
+
+            <TouchableOpacity onPress={()=>{setResults(null); setStylePrompt(''); setActivePreset(null);}}
+              style={{marginTop:8, padding:12, alignItems:'center'}}>
+              <Text style={[sh.body, {color:T.t3}]}>← Generate another look</Text>
+            </TouchableOpacity>
+            <Text style={[sh.tiny, {textAlign:'center', marginTop:4}]}>Affiliate disclosure · FanDrop earns a commission · Prices may vary</Text>
+          </View>
+        )}
+      </ScrollView>
+    </View>
+  );
+}
+
+// ─── FANI AI ──────────────────────────────────────────────────────────────────
+function FaniScreen() {
+  const myIdols = useStore(s=>s.myIdols);
+  const myIdolData = myIdols.map(id=>getIdol(id)).filter(Boolean) as Idol[];
+  const [messages, setMessages] = useState<ChatMsg[]>([]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+  const insets = useSafeAreaInsets();
+
+  const QUICK = [
+    'What should I buy first as a new ARMY?',
+    'How do I learn BTS fanchants fast?',
+    'Best budget way to collect photocards?',
+    'How early should I arrive at a K-pop concert?',
+    'What K-pop albums dropped in 2026?',
+  ];
+
+  const SYSTEM = `You are FANI, a knowledgeable enthusiastic K-pop fan assistant. You know everything about K-pop — groups, members, songs, concerts, photocards, fan culture, fanchants, merchandise. You're warm and talk like a fellow fan. Keep responses concise (2–4 sentences unless listing things). Use emoji sparingly. You help fans solve real problems. The user follows: ${myIdolData.map(i=>i.name).join(', ')}. Current date: May 2026.`;
+
+  const renderText = (text: string) =>
+    text.replace(/\*\*(.+?)\*\*/g,'$1').replace(/\*(.+?)\*/g,'$1');
+
+  const send = async () => {
+    const msg = input.trim();
+    if(!msg || loading) return;
+    setInput('');
+    const newHist: ChatMsg[] = [...messages, {role:'user', content:msg}];
+    setMessages(newHist);
+    setLoading(true);
+    try {
+      const reply = await callClaude(SYSTEM, newHist);
+      setMessages(h=>[...h, {role:'assistant', content:renderText(reply)}]);
+    } catch {
+      setMessages(h=>[...h, {role:'assistant', content:"Oops, something went wrong. Check your connection and try again! 💜"}]);
+    } finally { setLoading(false); }
+  };
+
+  useEffect(()=>{
+    setTimeout(()=>scrollRef.current?.scrollToEnd({animated:true}), 80);
+  }, [messages]);
+
+  return (
+    <View style={{flex:1, backgroundColor:T.bg}}>
+      {/* Header */}
+      <SafeAreaView edges={['top']}>
+        <View style={{padding:22, paddingBottom:14, borderBottomWidth:1, borderBottomColor:'rgba(255,255,255,0.06)', flexDirection:'row', gap:12, alignItems:'center'}}>
+          <LinearGradient colors={['#7c3aed','#ec4899']} style={sh.faniIconBg}>
+            <Text style={{fontSize:20}}>🤖</Text>
+          </LinearGradient>
+          <View>
+            <View style={{flexDirection:'row', alignItems:'center', gap:7, marginBottom:1}}>
+              <Text style={[sh.bodyBold, {fontSize:18}]}>FANI</Text>
+              <View style={{flexDirection:'row', gap:4, alignItems:'center'}}>
+                <View style={sh.liveDot}/><Text style={sh.urgencyText}>AI LIVE</Text>
+              </View>
+            </View>
+            <Text style={[sh.small, {color:T.t2}]}>Powered by Claude · Ask anything K-pop</Text>
+          </View>
+        </View>
+      </SafeAreaView>
+
+      {/* Messages */}
+      <ScrollView ref={scrollRef} style={{flex:1}} contentContainerStyle={{padding:16}}
+        showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        {messages.length===0 && (
+          <View>
+            <View style={{alignItems:'center', paddingVertical:20}}>
+              <Text style={{fontSize:40, marginBottom:10}}>💜</Text>
+              <Text style={[sh.bodyBold, {fontSize:15, marginBottom:5}]}>Hi! I'm FANI</Text>
+              <Text style={[sh.body, {color:T.t2, textAlign:'center', lineHeight:22}]}>Ask me anything K-pop — concerts, merch, music, culture, and more.</Text>
+            </View>
+            <Lbl mb={10}>Quick questions</Lbl>
+            {QUICK.map((q,i)=>(
+              <TouchableOpacity key={i} onPress={()=>setInput(q)} activeOpacity={0.8}
+                style={[sh.card, {padding:12, marginBottom:7}]}>
+                <Text style={[sh.body, {color:T.t2}]}>{q}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+        {messages.map((msg,i)=>(
+          <View key={i} style={{marginBottom:12, alignItems:msg.role==='user'?'flex-end':'flex-start'}}>
+            {msg.role==='assistant' && <Text style={[sh.tiny, {marginBottom:4}]}>FANI 🤖</Text>}
+            <View style={[sh.bubble, msg.role==='user'
+              ? {backgroundColor:'#7c3aed', borderRadius:18, borderBottomRightRadius:4}
+              : {backgroundColor:'rgba(255,255,255,0.07)', borderWidth:1, borderColor:T.border, borderRadius:18, borderBottomLeftRadius:4}
+            ]}>
+              <Text style={[sh.body, {color:'rgba(255,255,255,0.92)', lineHeight:22}]}>{msg.content}</Text>
+            </View>
+          </View>
+        ))}
+        {loading && (
+          <View style={{flexDirection:'row', gap:6, alignItems:'center', marginBottom:12}}>
+            <LinearGradient colors={['#7c3aed','#ec4899']} style={[sh.faniIconBg, {width:34, height:34}]}>
+              <Text style={{fontSize:14}}>🤖</Text>
+            </LinearGradient>
+            <View style={{flexDirection:'row', gap:5}}>
+              {[0,1,2].map(n=><View key={n} style={[sh.dot, {opacity:0.3+n*0.25}]}/>)}
+            </View>
+          </View>
+        )}
+      </ScrollView>
+
+      {/* Input */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS==='ios'?'padding':'height'}
+        keyboardVerticalOffset={Platform.OS==='ios'?90:60}>
+        <View style={{padding:12, paddingBottom:insets.bottom+12, borderTopWidth:1, borderTopColor:'rgba(255,255,255,0.06)', backgroundColor:T.bg}}>
+          <View style={{flexDirection:'row', gap:9, alignItems:'flex-end'}}>
+            <View style={{flex:1, borderRadius:16, backgroundColor:'rgba(255,255,255,0.07)', borderWidth:1, borderColor:'rgba(255,255,255,0.1)', padding:12}}>
+              <TextInput
+                value={input}
+                onChangeText={setInput}
+                onSubmitEditing={send}
+                placeholder="Ask FANI anything K-pop…"
+                placeholderTextColor={T.t3}
+                multiline returnKeyType="send"
+                style={[sh.body, {color:T.t1, lineHeight:20, maxHeight:100}]}
+              />
+            </View>
+            <TouchableOpacity onPress={send} disabled={!input.trim()||loading} activeOpacity={0.8}
+              style={{width:44, height:44, borderRadius:13, overflow:'hidden'}}>
+              <LinearGradient
+                colors={input.trim()&&!loading ? ['#7c3aed','#ec4899'] : [T.t4,T.t4]}
+                style={{flex:1, alignItems:'center', justifyContent:'center'}}>
+                <Text style={{fontSize:16, color:'#fff'}}>↑</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+          <Text style={[sh.tiny, {textAlign:'center', marginTop:7}]}>FANI is an AI — always verify critical info.</Text>
+        </View>
+      </KeyboardAvoidingView>
+    </View>
+  );
+}
+
+// ─── FAN HUB ──────────────────────────────────────────────────────────────────
+function FanHubScreen() {
+  const myIdols = useStore(s=>s.myIdols);
+  const [section, setSection] = useState('fanchant');
+  const [openFanchant, setOpenFanchant] = useState<number|null>(null);
+  const [glossSearch, setGlossSearch] = useState('');
+
+  const SECTIONS = [
+    {id:'fanchant',label:'🎤 Fanchants'},
+    {id:'merch',label:'🛍 Merch Shops'},
+    {id:'budget',label:'💰 Budget Tips'},
+    {id:'glossary',label:'📖 Glossary'},
+    {id:'mygroups',label:'⚙️ My Groups'},
+  ];
+
+  const filteredGloss = GLOSSARY.filter(g=>
+    !glossSearch || g.t.toLowerCase().includes(glossSearch.toLowerCase()) ||
+    g.d.toLowerCase().includes(glossSearch.toLowerCase())
+  );
+
+  return (
+    <View style={{flex:1, backgroundColor:T.bg}}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{paddingBottom:100}}>
+        <SafeAreaView>
+          <View style={{paddingHorizontal:22, paddingTop:22, paddingBottom:0}}>
+            <Lbl>Fan Tools & Resources</Lbl>
+            <Text style={[sh.headL, {marginBottom:14}]}>Fan Hub</Text>
+          </View>
+
+          {/* Section pills */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap:8, paddingHorizontal:20, paddingBottom:18, paddingRight:32}}>
+            {SECTIONS.map(s=>(
+              <TouchableOpacity key={s.id} onPress={()=>setSection(s.id)} activeOpacity={0.8}
+                style={[sh.pill, {paddingVertical:7, paddingHorizontal:14,
+                  backgroundColor:section===s.id?'rgba(255,255,255,0.14)':'rgba(255,255,255,0.04)',
+                  borderColor:section===s.id?'rgba(255,255,255,0.18)':T.border}]}>
+                <Text style={[sh.pillText, {color:section===s.id?T.t1:T.t3}]}>{s.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </SafeAreaView>
+
+        <View style={{paddingHorizontal:20}}>
+
+          {/* FANCHANTS */}
+          {section==='fanchant' && (
+            <View>
+              <View style={{padding:12, borderRadius:14, backgroundColor:'rgba(124,58,237,0.07)', borderWidth:1, borderColor:'rgba(124,58,237,0.18)', marginBottom:14}}>
+                <Text style={[sh.body, {color:T.t2, lineHeight:20}]}><Text style={{color:T.t1, fontFamily:T.bodySB}}>What is a fanchant?</Text> Scripted fan cheers tied to specific song moments. The whole crowd chants in unison — one of the most electric parts of any K-pop concert.</Text>
+              </View>
+              {FANCHANTS.map((fc,i)=>{
+                const idol = getIdol(fc.idol);
+                const open = openFanchant===i;
+                return (
+                  <Card key={i} style={{overflow:'hidden', marginBottom:11}}>
+                    <ColorBar color={idol?.color||'#7c3aed'}/>
+                    <TouchableOpacity activeOpacity={0.8} onPress={()=>setOpenFanchant(open?null:i)}
+                      style={{padding:14, flexDirection:'row', gap:11, alignItems:'center'}}>
+                      <View style={[sh.idolIconBg, {backgroundColor:(idol?.color||'#7c3aed')+'18'}]}>
+                        <Text style={{fontSize:20}}>{idol?.emoji||'🎵'}</Text>
+                      </View>
+                      <View style={{flex:1}}>
+                        <Text style={[sh.bodyBold, {fontSize:14, marginBottom:3}]}>{fc.song}</Text>
+                        {idol && <IdolChip id={idol.id}/>}
+                      </View>
+                      <Text style={{fontSize:18, color:T.t4}}>{open?'∨':'›'}</Text>
+                    </TouchableOpacity>
+                    {open && (
+                      <View style={{paddingHorizontal:14, paddingBottom:14, borderTopWidth:1, borderTopColor:'rgba(255,255,255,0.06)'}}>
+                        <Text style={[sh.body, {color:T.t2, lineHeight:20, marginVertical:10}]}>{fc.guide}</Text>
+                        {fc.lines.map((l,li)=>(
+                          <View key={li} style={{borderRadius:12, backgroundColor:'rgba(255,255,255,0.04)', borderWidth:1, borderColor:T.border, padding:11, marginBottom:7}}>
+                            <Text style={[sh.small, {color:T.t3, fontStyle:'italic', marginBottom:4}]}>"{l.lyric}"</Text>
+                            <Text style={[sh.bodyBold, {color:idol?.color||'#c084fc', fontFamily:T.mono, marginBottom:3}]}>{l.chant}</Text>
+                            <Text style={[sh.small, {color:T.t3}]}>{l.note}</Text>
+                          </View>
+                        ))}
+                        <TouchableOpacity onPress={()=>openURL(fc.ytUrl)} activeOpacity={0.8}
+                          style={[sh.outlineBtn, {borderColor:(idol?.color||'#7c3aed')+'33', backgroundColor:(idol?.color||'#7c3aed')+'0e', marginTop:4}]}>
+                          <Text style={[sh.outlineBtnText, {color:idol?.color||'#c084fc'}]}>▶ Full Fanchant Video on YouTube</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                    {!open && (
+                      <TouchableOpacity onPress={()=>setOpenFanchant(i)} activeOpacity={0.8}
+                        style={{paddingHorizontal:14, paddingBottom:12}}>
+                        <View style={[sh.outlineBtn, {borderColor:(idol?.color||'#7c3aed')+'22', backgroundColor:(idol?.color||'#7c3aed')+'08'}]}>
+                          <Text style={[sh.outlineBtnText, {color:idol?.color||'#c084fc'}]}>See Fanchant Lines →</Text>
+                        </View>
+                      </TouchableOpacity>
+                    )}
+                  </Card>
+                );
+              })}
+            </View>
+          )}
+
+          {/* MERCH */}
+          {section==='merch' && MERCH_SHOPS.map((s,i)=>(
+            <TouchableOpacity key={i} onPress={()=>openURL(s.url)} activeOpacity={0.8} style={{marginBottom:10}}>
+              <Card style={{padding:14}}>
+                <View style={{flexDirection:'row', gap:12, alignItems:'flex-start'}}>
+                  <View style={[sh.idolIconBg, {backgroundColor:s.color+'18', borderColor:s.color+'28'}]}>
+                    <Text style={{fontSize:18}}>🛍</Text>
+                  </View>
+                  <View style={{flex:1}}>
+                    <View style={{flexDirection:'row', gap:7, alignItems:'center', marginBottom:4, flexWrap:'wrap'}}>
+                      <Text style={sh.bodyBold}>{s.name}</Text>
+                      <View style={[sh.pill,{backgroundColor:s.color+'18'}]}><Text style={[sh.pillText,{color:s.color}]}>{s.tag}</Text></View>
+                      <AffTag/>
+                    </View>
+                    <Text style={[sh.small, {color:T.t2, lineHeight:18, marginBottom:6}]}>{s.desc}</Text>
+                    <Text style={[sh.small, {color:'#22c55e', fontFamily:T.mono}]}>{s.price}</Text>
+                  </View>
+                  <Text style={{fontSize:16, color:T.t4}}>↗</Text>
+                </View>
+              </Card>
+            </TouchableOpacity>
+          ))}
+
+          {/* BUDGET */}
+          {section==='budget' && (
+            <View>
+              <View style={{padding:12, borderRadius:14, backgroundColor:'rgba(34,197,94,0.07)', borderWidth:1, borderColor:'rgba(34,197,94,0.18)', marginBottom:14}}>
+                <Text style={[sh.body, {color:T.t2, lineHeight:20}]}>💚 K-pop is expensive. Concerts, lightsticks, albums, photocards — it adds up fast. These tips from real fan communities help you participate without breaking the bank.</Text>
+              </View>
+              {BUDGET_TIPS.map((t,i)=>(
+                <Card key={i} style={{padding:14, marginBottom:10}}>
+                  <View style={{flexDirection:'row', gap:11, alignItems:'flex-start'}}>
+                    <View style={{width:40, height:40, borderRadius:11, backgroundColor:'rgba(34,197,94,0.1)', borderWidth:1, borderColor:'rgba(34,197,94,0.18)', alignItems:'center', justifyContent:'center'}}>
+                      <Text style={{fontSize:18}}>{t.icon}</Text>
+                    </View>
+                    <View style={{flex:1}}>
+                      <Text style={[sh.bodyBold, {marginBottom:4}]}>{t.tip}</Text>
+                      <Text style={[sh.small, {color:T.t2, lineHeight:18, marginBottom:8}]}>{t.detail}</Text>
+                      <View style={[sh.pill, {backgroundColor:'rgba(34,197,94,0.1)', alignSelf:'flex-start'}]}>
+                        <Text style={[sh.pillText, {color:'#22c55e'}]}>{t.save}</Text>
+                      </View>
+                    </View>
+                  </View>
+                </Card>
+              ))}
+            </View>
+          )}
+
+          {/* GLOSSARY */}
+          {section==='glossary' && (
+            <View>
+              <View style={{flexDirection:'row', gap:9, alignItems:'center', backgroundColor:'rgba(255,255,255,0.05)', borderRadius:14, borderWidth:1, borderColor:T.border, padding:12, marginBottom:14}}>
+                <Text style={{fontSize:14, opacity:0.4}}>🔍</Text>
+                <TextInput
+                  value={glossSearch} onChangeText={setGlossSearch}
+                  placeholder="Search K-pop terms…" placeholderTextColor={T.t3}
+                  style={[sh.body, {color:T.t1, flex:1}]}
+                />
+              </View>
+              {filteredGloss.length===0
+                ? <View style={{alignItems:'center', padding:32}}><Text style={{fontSize:32, marginBottom:8}}>🔍</Text><Text style={[sh.body, {color:T.t3}]}>No terms found</Text></View>
+                : filteredGloss.map((g,i)=>(
+                  <View key={i} style={{padding:12, borderRadius:13, backgroundColor:'rgba(255,255,255,0.03)', borderWidth:1, borderColor:T.border, marginBottom:7}}>
+                    <Text style={[sh.bodyBold, {color:'#c084fc', fontFamily:T.mono, marginBottom:4}]}>{g.t}</Text>
+                    <Text style={[sh.body, {color:T.t2, lineHeight:20}]}>{g.d}</Text>
+                  </View>
+                ))
+              }
+            </View>
+          )}
+
+          {/* MY GROUPS */}
+          {section==='mygroups' && (
+            <View>
+              <Text style={[sh.body, {color:T.t2, lineHeight:20, marginBottom:16}]}>Your personalised feed, drops, and fanchants are based on the groups you follow.</Text>
+              <View style={{flexDirection:'row', flexWrap:'wrap', gap:10}}>
+                {IDOLS.map(idol=>{
+                  const sel = myIdols.includes(idol.id);
+                  return (
+                    <TouchableOpacity key={idol.id} activeOpacity={0.8}
+                      onPress={()=>store.set({myIdols:sel?myIdols.filter(x=>x!==idol.id):[...myIdols,idol.id]})}
+                      style={[sh.idolCard, {width:(SW-50)/2, borderColor:sel?idol.color+'55':T.border, backgroundColor:sel?idol.color+'12':'rgba(255,255,255,0.03)'}]}>
+                      <Text style={{fontSize:24, marginBottom:6}}>{idol.emoji}</Text>
+                      <Text style={[sh.bodyBold, {marginBottom:2}]}>{idol.name}</Text>
+                      <Text style={[sh.small, {color:T.t3, marginBottom:6}]}>{idol.fandom}</Text>
+                      {sel
+                        ? <View style={{width:'100%', height:2, backgroundColor:idol.color, borderRadius:1}}/>
+                        : <Text style={[sh.tiny, {color:T.t3}]}>Tap to follow</Text>
+                      }
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+// ─── NAVIGATION ───────────────────────────────────────────────────────────────
+const Tab = createBottomTabNavigator();
+const NAV_THEME = {
+  ...DefaultTheme,
+  colors: {...DefaultTheme.colors, background:T.bg, card:T.bg, border:'rgba(255,255,255,0.07)', text:T.t1},
+};
+
+const TAB_ICONS: Record<string,string> = {
+  Home:'⚡', Events:'🎟', Drops:'🎵', 'AI Style':'👗', FANI:'🤖', 'Fan Hub':'💜',
+};
+
+function TabNavigator({primaryColor}:{primaryColor:string}) {
+  return (
+    <Tab.Navigator
+      screenOptions={({route})=>({
+        headerShown:false,
+        tabBarStyle:{
+          backgroundColor:'rgba(6,4,14,0.97)',
+          borderTopColor:'rgba(255,255,255,0.07)',
+          borderTopWidth:1,
+          height:Platform.OS==='ios'?82:65,
+          paddingBottom:Platform.OS==='ios'?22:10,
+          paddingTop:8,
+          elevation:0,
+        },
+        tabBarActiveTintColor:primaryColor,
+        tabBarInactiveTintColor:'rgba(255,255,255,0.2)',
+        tabBarIcon:({focused})=>(
+          <Text style={{fontSize:focused?21:17}}>{TAB_ICONS[route.name]||'⚡'}</Text>
+        ),
+        tabBarLabel:({color,children})=>(
+          <Text style={{color, fontSize:9, fontFamily:T.mono, letterSpacing:0.3}}>{children}</Text>
+        ),
+      })}>
+      <Tab.Screen name="Home" component={HomeScreen}/>
+      <Tab.Screen name="Events" component={EventsScreen}/>
+      <Tab.Screen name="Drops" component={DropsScreen}/>
+      <Tab.Screen name="AI Style" component={StyleScreen}/>
+      <Tab.Screen name="FANI" component={FaniScreen}/>
+      <Tab.Screen name="Fan Hub" component={FanHubScreen}/>
+    </Tab.Navigator>
+  );
+}
+
+// ─── ROOT ─────────────────────────────────────────────────────────────────────
+export default function App() {
+  const [fontsLoaded] = useFonts({
+    Syne_700Bold, Syne_800ExtraBold, Syne_900Black,
+    DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold,
+    SpaceMono_400Regular, SpaceMono_700Bold,
+  });
+  const [appReady, setAppReady] = useState(false);
+  const hasOnboarded = useStore(s=>s.hasOnboarded);
+  const myIdols = useStore(s=>s.myIdols);
+  const primaryColor = (myIdols[0] ? getIdol(myIdols[0])?.color : null) || '#7c3aed';
+
+  useEffect(()=>{
+    if(fontsLoaded){
+      SplashScreen.hideAsync();
+      setAppReady(true);
+    }
+  }, [fontsLoaded]);
+
+  if(!appReady) return null;
+
+  if(!hasOnboarded) return (
+    <SafeAreaProvider>
+      <StatusBar style="light"/>
+      <OnboardingScreen/>
+    </SafeAreaProvider>
+  );
+
+  return (
+    <SafeAreaProvider>
+      <StatusBar style="light"/>
+      <NavigationContainer theme={NAV_THEME}>
+        <TabNavigator primaryColor={primaryColor}/>
+      </NavigationContainer>
+    </SafeAreaProvider>
+  );
+}
+
+// ─── SHARED STYLES ────────────────────────────────────────────────────────────
+const sh = StyleSheet.create({
+  // Typography
+  headXL:{fontFamily:'Syne_900Black', fontSize:44, color:T.t1, letterSpacing:-1, lineHeight:48},
+  headL:{fontFamily:'Syne_900Black', fontSize:28, color:T.t1, letterSpacing:-0.5, lineHeight:32},
+  bodyBold:{fontFamily:'DMSans_600SemiBold', fontSize:14, color:T.t1},
+  body:{fontFamily:'DMSans_400Regular', fontSize:13, color:T.t1},
+  bodyM:{fontFamily:'DMSans_500Medium', fontSize:13, color:T.t1},
+  small:{fontFamily:'DMSans_400Regular', fontSize:11, color:T.t1},
+  smallMono:{fontFamily:'SpaceMono_400Regular', fontSize:9, letterSpacing:0.5, color:T.t1},
+  mono:{fontFamily:'SpaceMono_400Regular', fontSize:12, color:T.t1},
+  lbl:{fontFamily:'SpaceMono_400Regular', fontSize:9, letterSpacing:2, textTransform:'uppercase', color:'rgba(255,255,255,0.28)'},
+  tiny:{fontFamily:'DMSans_400Regular', fontSize:9, color:'rgba(255,255,255,0.2)'},
+  // Layout
+  card:{borderRadius:20, backgroundColor:T.card, borderWidth:1, borderColor:T.border},
+  homeHero:{paddingTop:0},
+  concertCard:{borderRadius:22, padding:20, overflow:'hidden', position:'relative'},
+  urgencyPill:{flexDirection:'row', alignItems:'center', gap:6, paddingHorizontal:12, paddingVertical:6, borderRadius:20, backgroundColor:'rgba(239,68,68,0.12)', borderWidth:1, borderColor:'rgba(239,68,68,0.22)', alignSelf:'flex-start'},
+  urgencyText:{fontSize:9, color:'#ef4444', fontFamily:'SpaceMono_400Regular', fontWeight:'700'},
+  liveDot:{width:7, height:7, borderRadius:3.5, backgroundColor:'#ef4444'},
+  // Idol
+  idolCard:{borderRadius:16, padding:14, borderWidth:1.5},
+  idolIconBg:{width:44, height:44, borderRadius:12, alignItems:'center', justifyContent:'center', borderWidth:1},
+  idolChipRow:{flexDirection:'row', flexWrap:'wrap', gap:8},
+  chip:{flexDirection:'row', alignItems:'center', gap:6, paddingVertical:5, paddingHorizontal:12, borderRadius:20, borderWidth:1},
+  chipText:{fontSize:11, fontWeight:'700', fontFamily:'SpaceMono_400Regular'},
+  // Buttons
+  bigBtn:{borderRadius:16, paddingVertical:16, alignItems:'center', justifyContent:'center'},
+  bigBtnText:{fontFamily:'Syne_800ExtraBold', fontSize:14, color:'#fff', letterSpacing:-0.2},
+  affBtn:{borderRadius:13, paddingVertical:11, paddingHorizontal:14, alignItems:'center', justifyContent:'center'},
+  affBtnText:{fontFamily:'SpaceMono_700Bold', fontSize:12, color:'#fff'},
+  outlineBtn:{borderRadius:13, paddingVertical:11, paddingHorizontal:14, borderWidth:1, alignItems:'center', justifyContent:'center'},
+  outlineBtnText:{fontFamily:'SpaceMono_400Regular', fontSize:11},
+  pill:{borderRadius:50, paddingVertical:3, paddingHorizontal:8, borderWidth:1, borderColor:'rgba(255,255,255,0.07)'},
+  pillText:{fontFamily:'SpaceMono_400Regular', fontSize:9, fontWeight:'700'},
+  // Affiliate
+  affWrap:{paddingHorizontal:7, paddingVertical:2, borderRadius:10, backgroundColor:'rgba(251,191,36,0.12)'},
+  affText:{color:'#fbbf24', fontSize:9, fontWeight:'700', fontFamily:'SpaceMono_400Regular', letterSpacing:0.5},
+  // Drops
+  dropCard:{width:140, borderRadius:16, padding:12, borderWidth:1},
+  dropIconBg:{width:44, height:44, borderRadius:12, alignItems:'center', justifyContent:'center', borderWidth:1},
+  // Style
+  presetCard:{width:(SW-58)/3, borderRadius:13, padding:10, borderWidth:1, alignItems:'center'},
+  styleItemIcon:{width:48, height:48, borderRadius:13, alignItems:'center', justifyContent:'center', borderWidth:1},
+  wishBtn:{width:32, height:32, borderRadius:9, borderWidth:1, alignItems:'center', justifyContent:'center'},
+  // FANI
+  faniIconBg:{width:46, height:46, borderRadius:14, alignItems:'center', justifyContent:'center'},
+  bubble:{maxWidth:SW*0.82, padding:12, paddingHorizontal:14},
+  dot:{width:8, height:8, borderRadius:4, backgroundColor:'rgba(255,255,255,0.3)'},
+});
