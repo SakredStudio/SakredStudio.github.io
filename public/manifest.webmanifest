@@ -1,0 +1,16 @@
+{
+  "name": "Swaiyu",
+  "short_name": "Swaiyu",
+  "description": "Your K-pop fan super app — concerts, drops, style, and FANI.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0E0A1A",
+  "theme_color": "#0E0A1A",
+  "icons": [
+    { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

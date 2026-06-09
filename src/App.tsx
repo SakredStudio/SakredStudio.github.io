@@ -35,7 +35,7 @@ const G = `
   @keyframes fu{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
   .s1{animation-delay:.05s}.s2{animation-delay:.10s}.s3{animation-delay:.15s}
   .s4{animation-delay:.20s}.s5{animation-delay:.25s}.s6{animation-delay:.30s}
-  .card{border-radius:20px;background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.09)}
+  .card{border-radius:24px;background:rgba(139,63,255,.06);border:1px solid rgba(180,140,255,.14);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
   .pill{border-radius:50px;padding:6px 16px;font-size:11px;font-weight:700;border:none;cursor:pointer;white-space:nowrap;font-family:'Space Mono',monospace;transition:all .18s}
   .hrow{display:flex;gap:10px;overflow-x:auto;padding-bottom:2px}
   .spin{animation:sp .9s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}
@@ -59,6 +59,21 @@ const G = `
   .check-box{width:22px;height:22px;border-radius:7px;border:1.5px solid rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;transition:all .2s}
   .fc-card{border-radius:24px;overflow:hidden;position:relative;padding:24px 20px 20px;color:#fff}
 `;
+
+/* ═══════════════════════════════════════════════════════
+   BRAND + THEME TOKENS  (single source of truth)
+═══════════════════════════════════════════════════════ */
+const APP_NAME = "Swaiyu";
+
+const THEME = {
+  bg:        "#0E0A1A", // concert-night base (near-black, purple undertone)
+  text:      "#F5F0FF", // soft off-white
+  textMuted: "#A89CC4", // low-saturation lilac-gray (derived from the violet)
+  primary:   "#8B3FFF", // K-pop violet — default anchor
+  accent:    "#FF3DAE", // electric pink — used sparingly (Buy emphasis)
+  holoMid:   "#FF6EC7", // holographic gradient mid stop
+  holoEnd:   "#4DD0FF", // holographic gradient end stop
+};
 
 /* ═══════════════════════════════════════════════════════
    DATA
@@ -190,6 +205,14 @@ const loadChecked = (): Record<string, boolean> => {
   try { return JSON.parse(localStorage.getItem("fandrop_checkedItems") || "{}"); }
   catch { return {}; }
 };
+const loadWishlist = (): StyleItem[] => {
+  try { return JSON.parse(localStorage.getItem("fandrop_wishlist") || "[]"); }
+  catch { return []; }
+};
+const loadSavedEvent = (): number | null => {
+  try { return JSON.parse(localStorage.getItem("fandrop_savedEvent") || "null"); }
+  catch { return null; }
+};
 
 // ─── MINI COMPONENTS ─────────────────────────────────────────────────────────
 const Lbl = ({children, style}: {children: React.ReactNode; style?: React.CSSProperties}) =>
@@ -216,7 +239,7 @@ const ColorBar = ({color}: {color: string}) =>
 export default function FanDrop() {
   const [tab, setTab] = useState<TabId>("home");
   const [myIdols, setMyIdols] = useState<string[]>(loadIdols);
-  const [savedEvent, setSavedEvent] = useState<number | null>(null);
+  const [savedEvent, setSavedEvent] = useState<number | null>(loadSavedEvent);
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>(loadChecked);
   const [openFanchant, setOpenFanchant] = useState<number | null>(null);
   const [glossSearch, setGlossSearch] = useState("");
@@ -232,7 +255,7 @@ export default function FanDrop() {
   const [styleIdol, setStyleIdol] = useState("bts");
   const [styleMode, setStyleMode] = useState<AiMode>("idle");
   const [styleResults, setStyleResults] = useState<StyleResult | null>(null);
-  const [wishlist, setWishlist] = useState<StyleItem[]>([]);
+  const [wishlist, setWishlist] = useState<StyleItem[]>(loadWishlist);
   const [showWishlist, setShowWishlist] = useState(false);
   // Fan Card
   const [fanName, setFanName] = useState("");
@@ -264,7 +287,12 @@ export default function FanDrop() {
   };
 
   const myIdolData = myIdols.map(id => getIdol(id)).filter((x): x is Idol => !!x);
-  const primary = myIdolData[0] ?? IDOLS[0];
+  // Dynamic group theming: anchor = followed group's official color, else default violet.
+  const anchor = myIdolData[0]?.color ?? THEME.primary;
+  // Holographic hero gradient — first stop takes on the active group's color.
+  const heroGradient = `linear-gradient(135deg,${anchor},${THEME.holoMid},${THEME.holoEnd})`;
+  // Electric-pink emphasis for primary "Buy" CTAs.
+  const buyGradient = `linear-gradient(135deg,${THEME.accent},${THEME.holoMid})`;
 
   const ANTHROPIC_HEADERS = {
     "Content-Type": "application/json",
@@ -319,23 +347,27 @@ export default function FanDrop() {
   const css = `
     ${G}
     :root{
-      --bg:#06040e;
-      --s1:rgba(255,255,255,.055);
-      --b1:rgba(255,255,255,.08);
-      --t1:#f0eaff;
-      --t2:rgba(255,255,255,.45);
-      --t3:rgba(255,255,255,.22);
-      --a1:${primary.color};
-      --a2:#f472b6;
-      --grad:linear-gradient(135deg,${primary.color},#f472b6);
-      --gc:${hexToRgb(primary.color)};
+      --bg:${THEME.bg};
+      --s1:rgba(139,63,255,.07);
+      --b1:rgba(180,140,255,.13);
+      --t1:${THEME.text};
+      --t2:${THEME.textMuted};
+      --t3:rgba(168,156,196,.5);
+      --a1:${anchor};
+      --a2:${THEME.holoMid};
+      --grad:${heroGradient};
+      --gc:${hexToRgb(anchor)};
     }
   `;
 
   // Style AI helpers
   const toggleWish = (item: StyleItem) => {
     const has = wishlist.find(x => x.name === item.name);
-    setWishlist(w => has ? w.filter(x => x.name !== item.name) : [...w, item]);
+    setWishlist(w => {
+      const next = has ? w.filter(x => x.name !== item.name) : [...w, item];
+      localStorage.setItem("fandrop_wishlist", JSON.stringify(next));
+      return next;
+    });
     pushToast(has ? "Removed from wishlist" : "❤️ Saved to wishlist!");
   };
 
@@ -398,10 +430,10 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
   const shareFanCard = async () => {
     const biasIdol = getIdol(fanBias);
     const fandoms = myIdolData.map(i => i.fandom).join(", ");
-    const text = `🎶 FanDrop Fan Card\n\n${fanName || "A K-pop fan"}\n${biasIdol ? `Ultimate bias: ${biasIdol.emoji} ${biasIdol.name}` : ""}\nFandoms: ${fandoms}\nStan since: ${fanSince}\n\nGet FanDrop: https://fandrop.app`;
+    const text = `🎶 ${APP_NAME} Fan Card\n\n${fanName || "A K-pop fan"}\n${biasIdol ? `Ultimate bias: ${biasIdol.emoji} ${biasIdol.name}` : ""}\nFandoms: ${fandoms}\nStan since: ${fanSince}\n\nGet ${APP_NAME}: https://fandrop.app`;
     try {
       if (navigator.share) {
-        await navigator.share({title: "My FanDrop Fan Card", text});
+        await navigator.share({title: `My ${APP_NAME} Fan Card`, text});
       } else {
         await navigator.clipboard.writeText(text);
         pushToast("Fan Card copied to clipboard! 💜");
@@ -413,13 +445,13 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
 
   // ── ONBOARD ──────────────────────────────────────────────────────────────────
   if (showOnboard) return (
-    <div style={{fontFamily:"'DM Sans'",background:"#06040e",minHeight:"100vh",color:"#f0eaff",display:"flex",justifyContent:"center"}}>
+    <div style={{fontFamily:"'DM Sans'",background:THEME.bg,minHeight:"100vh",color:THEME.text,display:"flex",justifyContent:"center"}}>
       <style>{G}</style>
       <div style={{width:"100%",maxWidth:430,display:"flex",flexDirection:"column",minHeight:"100vh"}}>
         <div style={{flex:1,display:"flex",flexDirection:"column",justifyContent:"center",padding:"40px 24px 32px"}}>
           <div style={{textAlign:"center",marginBottom:36}}>
             <div style={{fontSize:52,marginBottom:14}}>🎶</div>
-            <div className="h1 gradient-text" style={{fontSize:42,marginBottom:8,background:"linear-gradient(135deg,#fff,#c084fc 55%,#f472b6)"}}>FanDrop</div>
+            <div className="h1 gradient-text" style={{fontSize:42,marginBottom:8,background:heroGradient}}>{APP_NAME}</div>
             <div className="sans" style={{fontSize:14,color:"rgba(255,255,255,.4)",lineHeight:1.7}}>The fan app built for real K-pop fans.<br/>Pick your groups to get started.</div>
           </div>
           <Lbl>Who do you stan? (pick all that apply)</Lbl>
@@ -438,8 +470,8 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
             })}
           </div>
           <button className="tap" onClick={() => setShowOnboard(false)} disabled={myIdols.length === 0}
-            style={{width:"100%",padding:"16px",borderRadius:16,border:"none",background:myIdols.length > 0 ? "linear-gradient(135deg,#7c3aed,#ec4899)" : "rgba(255,255,255,.07)",color:myIdols.length > 0 ? "#fff" : "rgba(255,255,255,.25)",fontSize:14,fontWeight:700,cursor:myIdols.length > 0 ? "pointer" : "default",fontFamily:"'Syne'",letterSpacing:"-.01em"}}>
-            Enter FanDrop {myIdols.length > 0 ? `— ${myIdols.length} group${myIdols.length > 1 ? "s" : ""} selected` : ""}
+            style={{width:"100%",padding:"16px",borderRadius:16,border:"none",background:myIdols.length > 0 ? heroGradient : "rgba(255,255,255,.07)",color:myIdols.length > 0 ? "#fff" : "rgba(255,255,255,.25)",fontSize:14,fontWeight:700,cursor:myIdols.length > 0 ? "pointer" : "default",fontFamily:"'Syne'",letterSpacing:"-.01em"}}>
+            Enter {APP_NAME} {myIdols.length > 0 ? `— ${myIdols.length} group${myIdols.length > 1 ? "s" : ""} selected` : ""}
           </button>
           <div className="sans" style={{textAlign:"center",marginTop:12,fontSize:11,color:"rgba(255,255,255,.2)"}}>You can change your groups anytime in Fan Hub</div>
         </div>
@@ -455,9 +487,9 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
     return (
       <div style={{overflowY:"auto",paddingBottom:90}}>
         <div style={{padding:"52px 22px 20px",position:"relative"}}>
-          <div style={{position:"absolute",top:0,left:0,right:0,height:220,background:`radial-gradient(ellipse at 70% -10%,${primary.color}18 0%,transparent 70%)`,pointerEvents:"none"}}/>
+          <div style={{position:"absolute",top:0,left:0,right:0,height:220,background:`radial-gradient(ellipse at 70% -10%,${anchor}18 0%,transparent 70%)`,pointerEvents:"none"}}/>
           <Lbl>Your K-Pop Universe</Lbl>
-          <div className="h1 gradient-text" style={{fontSize:44,marginBottom:6,background:`linear-gradient(135deg,#fff 0%,${primary.color} 55%,#f472b6 100%)`}}>FanDrop</div>
+          <div className="h1 gradient-text" style={{fontSize:44,marginBottom:6,background:heroGradient}}>{APP_NAME}</div>
           <div className="sans" style={{fontSize:13,color:"rgba(255,255,255,.38)",lineHeight:1.6}}>Concerts · Drops · Fan Tools · AI Fandom Assistant</div>
           <div style={{display:"flex",gap:8,marginTop:14,flexWrap:"wrap"}}>
             {myIdolData.map(idol => (
@@ -517,7 +549,7 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
 
         <div className="tap fade card" onClick={() => setTab("fani")} style={{margin:"0 20px 18px",padding:"18px 18px",background:"linear-gradient(135deg,rgba(124,58,237,.14),rgba(244,114,182,.08))",border:"1px solid rgba(192,132,252,.2)"}}>
           <div style={{display:"flex",gap:14,alignItems:"center"}}>
-            <div style={{width:50,height:50,borderRadius:16,background:"linear-gradient(135deg,#7c3aed,#ec4899)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>🤖</div>
+            <div style={{width:50,height:50,borderRadius:16,background:heroGradient,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>🤖</div>
             <div style={{flex:1}}>
               <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:3}}>
                 <div style={{fontSize:14,fontWeight:700}}>FANI — Your AI Fan Assistant</div>
@@ -569,7 +601,7 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
             const dy = getDays(ev.date);
             const sel = savedEvent === ev.id;
             return (
-              <div key={ev.id} className="tap" onClick={() => { setSavedEvent(ev.id); pushToast(`${evIdol?.emoji ?? "🎵"} ${ev.artist} concert saved!`); }}
+              <div key={ev.id} className="tap" onClick={() => { setSavedEvent(ev.id); localStorage.setItem("fandrop_savedEvent", JSON.stringify(ev.id)); pushToast(`${evIdol?.emoji ?? "🎵"} ${ev.artist} concert saved!`); }}
                 style={{borderRadius:18,background:sel ? `${evIdol?.color ?? "#7c3aed"}16` : "rgba(255,255,255,.04)",border:`1.5px solid ${sel ? (evIdol?.color ?? "#7c3aed")+"44" : "rgba(255,255,255,.07)"}`,padding:"13px 14px",display:"flex",gap:12,alignItems:"center",transition:"all .2s"}}>
                 <div style={{width:44,height:44,borderRadius:13,background:`${evIdol?.color ?? "#7c3aed"}18`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{evIdol?.emoji ?? "🎵"}</div>
                 <div style={{flex:1,minWidth:0}}>
@@ -660,7 +692,7 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
                 ))}
               </div>
             </div>
-            <div className="sans" style={{fontSize:10,color:"rgba(255,255,255,.18)",textAlign:"center"}}>Ticket & merch links are affiliate links · Prices may vary · FanDrop earns a commission</div>
+            <div className="sans" style={{fontSize:10,color:"rgba(255,255,255,.18)",textAlign:"center"}}>Ticket & merch links are affiliate links · Prices may vary · {APP_NAME} earns a commission</div>
           </div>
         )}
       </div>
@@ -712,7 +744,7 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
     <div style={{overflowY:"auto",paddingBottom:90}}>
       {wishlist.length > 0 && (
         <button className="tap" onClick={() => setShowWishlist(v => !v)} style={{position:"fixed",top:14,right:14,zIndex:400,width:40,height:40,borderRadius:12,background:"rgba(244,63,94,.15)",border:"1px solid rgba(244,63,94,.3)",cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>
-          ❤️<span style={{position:"absolute",top:-4,right:-4,width:17,height:17,borderRadius:"50%",background:"#f43f5e",fontSize:9,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",border:"2px solid #06040e",fontFamily:"'Space Mono'"}}>{wishlist.length}</span>
+          ❤️<span style={{position:"absolute",top:-4,right:-4,width:17,height:17,borderRadius:"50%",background:"#f43f5e",fontSize:9,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",border:`2px solid ${THEME.bg}`,fontFamily:"'Space Mono'"}}>{wishlist.length}</span>
         </button>
       )}
 
@@ -724,7 +756,9 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
               <div style={{fontSize:15,fontWeight:700,fontFamily:"'Syne'"}}>❤️ Wishlist ({wishlist.length})</div>
               <button className="tap" onClick={() => setShowWishlist(false)} style={{background:"none",border:"none",color:"rgba(255,255,255,.3)",fontSize:18,cursor:"pointer"}}>×</button>
             </div>
-            {wishlist.map((item, i) => (
+            {wishlist.map((item, i) => {
+              const validUrl = typeof item.url === "string" && /^https?:\/\//i.test(item.url) ? item.url : null;
+              return (
               <div key={i} style={{display:"flex",gap:12,alignItems:"center",padding:"11px 0",borderBottom:"1px solid rgba(255,255,255,.06)"}}>
                 <div style={{width:40,height:40,borderRadius:10,background:"rgba(255,255,255,.05)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>👗</div>
                 <div style={{flex:1}}>
@@ -732,12 +766,13 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
                   <div className="sans" style={{fontSize:10,color:"rgba(255,255,255,.35)"}}>{item.store} · {item.price}</div>
                 </div>
                 <div style={{display:"flex",gap:7}}>
-                  <a href={item.url} target="_blank" rel="noopener noreferrer"><button className="tap" style={{padding:"6px 12px",borderRadius:9,border:"1px solid rgba(192,132,252,.25)",background:"rgba(192,132,252,.1)",color:"#c084fc",fontSize:10,cursor:"pointer",fontFamily:"'Space Mono'"}}>Buy ↗</button></a>
+                  {validUrl && <a href={validUrl} target="_blank" rel="noopener noreferrer"><button className="tap" style={{padding:"6px 12px",borderRadius:9,border:"1px solid rgba(192,132,252,.25)",background:"rgba(192,132,252,.1)",color:"#c084fc",fontSize:10,cursor:"pointer",fontFamily:"'Space Mono'"}}>Buy ↗</button></a>}
                   <button className="tap" onClick={() => toggleWish(item)} style={{padding:"6px 10px",borderRadius:9,border:"1px solid rgba(244,63,94,.2)",background:"rgba(244,63,94,.08)",color:"#f43f5e",fontSize:10,cursor:"pointer"}}>×</button>
                 </div>
               </div>
-            ))}
-            <div className="sans" style={{marginTop:12,fontSize:9,color:"rgba(255,255,255,.18)",textAlign:"center"}}>All links are affiliate — FanDrop earns a commission at no extra cost to you</div>
+              );
+            })}
+            <div className="sans" style={{marginTop:12,fontSize:9,color:"rgba(255,255,255,.18)",textAlign:"center"}}>All links are affiliate — {APP_NAME} earns a commission at no extra cost to you</div>
           </div>
         </div>
       )}
@@ -751,7 +786,7 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
 
       <div style={{margin:"0 20px 16px",padding:"9px 13px",borderRadius:13,background:"rgba(251,191,36,.06)",border:"1px solid rgba(251,191,36,.15)",display:"flex",gap:9,alignItems:"center"}}>
         <span style={{fontSize:14}}>💸</span>
-        <div className="sans" style={{fontSize:11,color:"rgba(251,191,36,.8)",lineHeight:1.5}}>Every "Buy ↗" earns FanDrop a commission via affiliate programs — at no extra cost to you.</div>
+        <div className="sans" style={{fontSize:11,color:"rgba(251,191,36,.8)",lineHeight:1.5}}>Every "Buy ↗" earns {APP_NAME} a commission via affiliate programs — at no extra cost to you.</div>
       </div>
 
       <div style={{padding:"0 20px 16px"}}>
@@ -776,10 +811,10 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
 
         <Lbl style={{marginBottom:8}}>Or describe your own look</Lbl>
         <div style={{borderRadius:14,background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",padding:"12px 14px",marginBottom:14}}>
-          <textarea value={stylePrompt} onChange={e => setStylePrompt(e.target.value)} placeholder="e.g. BTS Butter era pastel summer look, or BLACKPINK Paris Fashion Week street style…" rows={2} style={{width:"100%",background:"none",border:"none",color:"#f0eaff",fontSize:13,resize:"none",outline:"none",lineHeight:1.55}}/>
+          <textarea value={stylePrompt} onChange={e => setStylePrompt(e.target.value)} placeholder="e.g. BTS Butter era pastel summer look, or BLACKPINK Paris Fashion Week street style…" rows={2} style={{width:"100%",background:"none",border:"none",color:THEME.text,fontSize:13,resize:"none",outline:"none",lineHeight:1.55}}/>
         </div>
 
-        <button className="tap" onClick={generateStyle} disabled={styleMode === "loading"} style={{width:"100%",padding:"15px",borderRadius:15,border:"none",background:styleMode === "loading" ? "rgba(192,132,252,.15)" : "linear-gradient(135deg,#7c3aed,#ec4899)",color:"#fff",fontSize:13,fontWeight:700,cursor:styleMode === "loading" ? "default" : "pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:9,fontFamily:"'Syne'",letterSpacing:"-.01em",boxShadow:styleMode !== "loading" ? "0 8px 28px rgba(124,58,237,.35)" : "none",transition:"all .2s"}}>
+        <button className="tap" onClick={generateStyle} disabled={styleMode === "loading"} style={{width:"100%",padding:"15px",borderRadius:15,border:"none",background:styleMode === "loading" ? "rgba(192,132,252,.15)" : heroGradient,color:"#fff",fontSize:13,fontWeight:700,cursor:styleMode === "loading" ? "default" : "pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:9,fontFamily:"'Syne'",letterSpacing:"-.01em",boxShadow:styleMode !== "loading" ? "0 8px 28px rgba(124,58,237,.35)" : "none",transition:"all .2s"}}>
           {styleMode === "loading" ? (
             <><div className="spin" style={{width:18,height:18,border:"2px solid rgba(255,255,255,.25)",borderTopColor:"#fff",borderRadius:"50%"}}/>Styling your look…</>
           ) : <>✨ Generate Outfit & Shop Links</>}
@@ -798,15 +833,17 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
             {(styleResults.items ?? []).map((item, i) => {
               const inWish = wishlist.find(x => x.name === item.name);
+              const catLabel = typeof item.cat === "string" ? item.cat.toUpperCase() : "";
+              const validUrl = typeof item.url === "string" && /^https?:\/\//i.test(item.url) ? item.url : null;
               return (
                 <div key={i} className="card fade" style={{overflow:"hidden",animationDelay:`${i*.05}s`}}>
-                  <div style={{height:2,background:"linear-gradient(90deg,#7c3aed,#ec4899)"}}/>
+                  <div style={{height:2,background:heroGradient}}/>
                   <div style={{padding:"12px 13px",display:"flex",gap:11,alignItems:"flex-start"}}>
                     <div style={{width:48,height:48,borderRadius:13,background:"rgba(192,132,252,.1)",border:"1px solid rgba(192,132,252,.18)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:20}}>
                       {item.cat==="Top"?"👕":item.cat==="Bottom"?"👖":item.cat==="Shoes"?"👟":item.cat==="Outer"?"🧥":item.cat==="Bag"?"👜":"💍"}
                     </div>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:9,color:"#a78bfa",fontFamily:"'Space Mono'",letterSpacing:".1em",marginBottom:2}}>{item.cat.toUpperCase()}</div>
+                      <div style={{fontSize:9,color:"#a78bfa",fontFamily:"'Space Mono'",letterSpacing:".1em",marginBottom:2}}>{catLabel}</div>
                       <div style={{fontSize:13,fontWeight:700,marginBottom:2,lineHeight:1.2}}>{item.name}</div>
                       <div className="sans" style={{fontSize:11,color:"rgba(255,255,255,.38)",marginBottom:5}}>{item.store}</div>
                       <div className="sans" style={{fontSize:11,color:"rgba(255,255,255,.45)",lineHeight:1.5,marginBottom:7,fontStyle:"italic"}}>"{item.why}"</div>
@@ -820,9 +857,11 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
                     </button>
                   </div>
                   <div style={{padding:"0 13px 12px",display:"flex",gap:8}}>
-                    <a href={item.url} target="_blank" rel="noopener noreferrer" style={{flex:1}}>
-                      <button className="tap" style={{width:"100%",padding:"10px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#7c3aed,#ec4899)",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Space Mono'"}}>Buy at {item.store} ↗</button>
+                    {validUrl && (
+                    <a href={validUrl} target="_blank" rel="noopener noreferrer" style={{flex:1}}>
+                      <button className="tap" style={{width:"100%",padding:"10px",borderRadius:12,border:"none",background:buyGradient,color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Space Mono'",boxShadow:`0 6px 20px ${THEME.accent}55`}}>Buy at {item.store} ↗</button>
                     </a>
+                    )}
                     {item.budget && (() => {
                       const budgetStore = item.budget.split(" ")[0].toLowerCase();
                       const budgetUrl = budgetStore === "shein" ? "https://shein.com" : budgetStore === "temu" ? "https://temu.com" : budgetStore === "romwe" ? "https://romwe.com" : "https://yesstyle.com";
@@ -848,7 +887,7 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
           </div>
 
           <div style={{marginTop:10,padding:"8px",borderRadius:10,background:"rgba(255,255,255,.02)"}}>
-            <div className="sans" style={{fontSize:9,color:"rgba(255,255,255,.18)",textAlign:"center"}}>Affiliate disclosure · FanDrop earns a commission on purchases at no extra cost to you · Prices may vary · AI-generated suggestions</div>
+            <div className="sans" style={{fontSize:9,color:"rgba(255,255,255,.18)",textAlign:"center"}}>Affiliate disclosure · {APP_NAME} earns a commission on purchases at no extra cost to you · Prices may vary · AI-generated suggestions</div>
           </div>
 
           <button className="tap" onClick={() => { setStyleResults(null); setStyleMode("idle"); setStylePrompt(""); }} style={{marginTop:12,width:"100%",padding:"10px",borderRadius:12,border:"1px solid rgba(255,255,255,.07)",background:"transparent",color:"rgba(255,255,255,.3)",fontSize:12,cursor:"pointer",fontFamily:"'DM Sans'"}}>← Generate another look</button>
@@ -871,7 +910,7 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
       <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 60px - env(safe-area-inset-bottom, 0px))"}}>
         <div style={{padding:"52px 22px 16px",borderBottom:"1px solid rgba(255,255,255,.06)",flexShrink:0}}>
           <div style={{display:"flex",gap:12,alignItems:"center"}}>
-            <div style={{width:46,height:46,borderRadius:14,background:"linear-gradient(135deg,#7c3aed,#ec4899)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>🤖</div>
+            <div style={{width:46,height:46,borderRadius:14,background:heroGradient,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>🤖</div>
             <div>
               <div style={{display:"flex",gap:7,alignItems:"center",marginBottom:1}}>
                 <div className="h1" style={{fontSize:18}}>FANI</div>
@@ -903,14 +942,14 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
           {aiMessages.map((msg, i) => (
             <div key={i} className="fade" style={{marginBottom:12,display:"flex",flexDirection:"column",alignItems:msg.role === "user" ? "flex-end" : "flex-start"}}>
               {msg.role === "assistant" && <div style={{fontSize:9,color:"rgba(255,255,255,.28)",fontFamily:"'Space Mono'",marginBottom:4}}>FANI 🤖</div>}
-              <div style={{maxWidth:"85%",padding:"11px 14px",borderRadius:msg.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px",background:msg.role === "user" ? "linear-gradient(135deg,#7c3aed,#ec4899)" : "rgba(255,255,255,.07)",border:msg.role === "assistant" ? "1px solid rgba(255,255,255,.08)" : "none"}}>
+              <div style={{maxWidth:"85%",padding:"11px 14px",borderRadius:msg.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px",background:msg.role === "user" ? heroGradient : "rgba(255,255,255,.07)",border:msg.role === "assistant" ? "1px solid rgba(255,255,255,.08)" : "none"}}>
                 <div className="sans" style={{fontSize:13,lineHeight:1.65,color:"rgba(255,255,255,.9)",whiteSpace:"pre-wrap"}}>{msg.content}</div>
               </div>
             </div>
           ))}
           {aiMode === "loading" && (
             <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:12}}>
-              <div style={{width:36,height:36,borderRadius:12,background:"linear-gradient(135deg,#7c3aed,#ec4899)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15}}>🤖</div>
+              <div style={{width:36,height:36,borderRadius:12,background:heroGradient,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15}}>🤖</div>
               <div style={{display:"flex",gap:5}}>
                 {[0,1,2].map(n => <div key={n} style={{width:7,height:7,borderRadius:"50%",background:"rgba(255,255,255,.3)",animation:`pulse ${1+n*.2}s ease-in-out infinite`}}/>)}
               </div>
@@ -922,9 +961,9 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
         <div style={{flexShrink:0,padding:"12px 16px 16px",borderTop:"1px solid rgba(255,255,255,.06)",background:"rgba(6,4,14,.97)",backdropFilter:"blur(20px)"}}>
           <div style={{display:"flex",gap:9,alignItems:"flex-end"}}>
             <div style={{flex:1,borderRadius:16,background:"rgba(255,255,255,.07)",border:"1px solid rgba(255,255,255,.1)",padding:"11px 14px"}}>
-              <textarea value={aiInput} onChange={e => setAiInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendAiMessage(); } }} placeholder="Ask FANI anything K-pop…" rows={1} style={{width:"100%",background:"none",border:"none",color:"#f0eaff",fontSize:13,resize:"none",outline:"none",lineHeight:1.5}}/>
+              <textarea value={aiInput} onChange={e => setAiInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendAiMessage(); } }} placeholder="Ask FANI anything K-pop…" rows={1} style={{width:"100%",background:"none",border:"none",color:THEME.text,fontSize:13,resize:"none",outline:"none",lineHeight:1.5}}/>
             </div>
-            <button className="tap" onClick={() => sendAiMessage()} disabled={!aiInput.trim() || aiMode === "loading"} style={{width:44,height:44,borderRadius:13,border:"none",background:aiInput.trim() && aiMode !== "loading" ? "linear-gradient(135deg,#7c3aed,#ec4899)" : "rgba(255,255,255,.08)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,cursor:"pointer",flexShrink:0}}>
+            <button className="tap" onClick={() => sendAiMessage()} disabled={!aiInput.trim() || aiMode === "loading"} style={{width:44,height:44,borderRadius:13,border:"none",background:aiInput.trim() && aiMode !== "loading" ? heroGradient : "rgba(255,255,255,.08)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,cursor:"pointer",flexShrink:0}}>
               {aiMode === "loading" ? <div className="spin" style={{width:16,height:16,border:"2px solid rgba(255,255,255,.3)",borderTopColor:"#fff",borderRadius:"50%"}}/> : "↑"}
             </button>
           </div>
@@ -968,11 +1007,11 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
               reader.readAsDataURL(file);
             }}/>
 
-            <div className="fc-card" style={{background:`linear-gradient(135deg,${primary.color}cc,#1a0a2e 60%,#0c0020)`,marginBottom:16,minHeight:220}}>
+            <div className="fc-card" style={{background:`linear-gradient(135deg,${anchor}cc,#1a0a2e 60%,#0c0020)`,marginBottom:16,minHeight:220}}>
               <div style={{position:"absolute",inset:0,background:"radial-gradient(ellipse at 80% 20%,rgba(255,255,255,.05),transparent 60%)",pointerEvents:"none"}}/>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16,position:"relative"}}>
                 <div>
-                  <div style={{fontSize:9,letterSpacing:".2em",opacity:.6,fontFamily:"'Space Mono'",textTransform:"uppercase",marginBottom:4}}>FanDrop</div>
+                  <div style={{fontSize:9,letterSpacing:".2em",opacity:.6,fontFamily:"'Space Mono'",textTransform:"uppercase",marginBottom:4}}>{APP_NAME}</div>
                   <div className="h1" style={{fontSize:28,lineHeight:1.1}}>{fanName || "Your Name"}</div>
                 </div>
                 <div className="tap" onClick={() => fileRef.current?.click()} style={{width:56,height:56,borderRadius:16,background:"rgba(255,255,255,.12)",border:"1.5px dashed rgba(255,255,255,.3)",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",flexShrink:0,cursor:"pointer"}}>
@@ -998,7 +1037,7 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
 
             <Lbl style={{marginBottom:8}}>Your fan name</Lbl>
             <div style={{borderRadius:12,background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",padding:"11px 14px",marginBottom:12}}>
-              <input value={fanName} onChange={e => setFanName(e.target.value)} placeholder="e.g. PurpleWave / BTS_Joonie" maxLength={28} style={{width:"100%",background:"none",border:"none",color:"#f0eaff",fontSize:13,outline:"none"}}/>
+              <input value={fanName} onChange={e => setFanName(e.target.value)} placeholder="e.g. PurpleWave / BTS_Joonie" maxLength={28} style={{width:"100%",background:"none",border:"none",color:THEME.text,fontSize:13,outline:"none"}}/>
             </div>
 
             <Lbl style={{marginBottom:8}}>Ultimate bias group</Lbl>
@@ -1018,7 +1057,7 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
             </div>
 
             <div style={{display:"flex",gap:9}}>
-              <button className="tap" onClick={shareFanCard} style={{flex:1,padding:"14px",borderRadius:14,border:"none",background:"linear-gradient(135deg,#7c3aed,#ec4899)",color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Syne'",letterSpacing:"-.01em"}}>
+              <button className="tap" onClick={shareFanCard} style={{flex:1,padding:"14px",borderRadius:14,border:"none",background:heroGradient,color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Syne'",letterSpacing:"-.01em"}}>
                 💜 Share Fan Card
               </button>
               <button className="tap" onClick={() => fileRef.current?.click()} style={{padding:"14px 16px",borderRadius:14,border:"1px solid rgba(255,255,255,.1)",background:"rgba(255,255,255,.04)",color:"rgba(255,255,255,.6)",fontSize:13,cursor:"pointer"}}>
@@ -1094,7 +1133,7 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
                 </div>
               </a>
             ))}
-            <div className="sans" style={{fontSize:10,color:"rgba(255,255,255,.18)",textAlign:"center",padding:"4px 0"}}>All links are affiliate links · FanDrop earns a small commission at no extra cost to you</div>
+            <div className="sans" style={{fontSize:10,color:"rgba(255,255,255,.18)",textAlign:"center",padding:"4px 0"}}>All links are affiliate links · {APP_NAME} earns a small commission at no extra cost to you</div>
           </div>
         )}
 
@@ -1124,7 +1163,7 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
           <div style={{padding:"0 20px",paddingBottom:24}}>
             <div style={{background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.09)",borderRadius:14,padding:"10px 14px",display:"flex",gap:9,alignItems:"center",marginBottom:14}}>
               <span style={{opacity:.4,fontSize:14}}>🔍</span>
-              <input value={glossSearch} onChange={e => setGlossSearch(e.target.value)} placeholder="Search K-pop terms…" style={{background:"none",border:"none",color:"#f0eaff",fontSize:13,flex:1,outline:"none"}}/>
+              <input value={glossSearch} onChange={e => setGlossSearch(e.target.value)} placeholder="Search K-pop terms…" style={{background:"none",border:"none",color:THEME.text,fontSize:13,flex:1,outline:"none"}}/>
             </div>
             {GLOSSARY.filter(g => !glossSearch || g.t.toLowerCase().includes(glossSearch.toLowerCase()) || g.d.toLowerCase().includes(glossSearch.toLowerCase())).map((g, i) => (
               <div key={i} style={{padding:"11px 14px",borderRadius:13,background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.06)",marginBottom:7}}>
@@ -1168,7 +1207,7 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
 
   // ── MAIN LAYOUT ────────────────────────────────────────────────────────────────
   return (
-    <div style={{fontFamily:"'DM Sans'",background:"#06040e",minHeight:"100vh",color:"#f0eaff",display:"flex",justifyContent:"center"}}>
+    <div style={{fontFamily:"'DM Sans'",background:THEME.bg,minHeight:"100vh",color:THEME.text,display:"flex",justifyContent:"center"}}>
       <style>{css}</style>
 
       <div className="toast-wrap">
@@ -1190,9 +1229,9 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
             const active = tab === t.id;
             return (
               <button key={t.id} className="tap" onClick={() => setTab(t.id)} style={{flex:1,background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"4px 0"}}>
-                <div style={{fontSize:active ? 21 : 17,transition:"all .2s",filter:active ? `drop-shadow(0 0 7px ${primary.color})` : "none"}}>{t.icon}</div>
-                <div style={{fontSize:8,fontWeight:700,color:active ? primary.color : "rgba(255,255,255,.2)",fontFamily:"'Space Mono'",letterSpacing:".04em",transition:"color .2s"}}>{t.label}</div>
-                {active && <div style={{width:3,height:3,borderRadius:"50%",background:primary.color,boxShadow:`0 0 6px ${primary.color}`}}/>}
+                <div style={{fontSize:active ? 21 : 17,transition:"all .2s",filter:active ? `drop-shadow(0 0 7px ${anchor})` : "none"}}>{t.icon}</div>
+                <div style={{fontSize:8,fontWeight:700,color:active ? anchor : "rgba(255,255,255,.2)",fontFamily:"'Space Mono'",letterSpacing:".04em",transition:"color .2s"}}>{t.label}</div>
+                {active && <div style={{width:3,height:3,borderRadius:"50%",background:anchor,boxShadow:`0 0 6px ${anchor}`}}/>}
               </button>
             );
           })}
