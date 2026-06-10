@@ -37,6 +37,21 @@ function buildStoreSearchUrl(store: string, itemName: string): string | null {
   if (!tpl) return null;
   return tpl.replace("{q}", encodeURIComponent(itemName));
 }
+
+// Maps a ticket provider (case-insensitive) → that provider's search-results URL for the
+// given artist, so Concert Kit "Get Tickets" links land on the artist's listings. Both
+// providers are in our Sovrn network, so plain outbound links auto-affiliate at click
+// time (same as the fashion Buy links). Unknown provider → null (caller skips the button).
+const TICKET_SEARCH_TEMPLATES: Record<string, string> = {
+  "vivid seats": "https://www.vividseats.com/search?searchTerm={q}",
+  "stubhub": "https://www.stubhub.com/secure/Search?q={q}",
+};
+function buildTicketSearchUrl(provider: string, query: string): string | null {
+  if (typeof provider !== "string" || typeof query !== "string") return null;
+  const tpl = TICKET_SEARCH_TEMPLATES[provider.trim().toLowerCase()];
+  if (!tpl) return null;
+  return tpl.replace("{q}", encodeURIComponent(query));
+}
 interface Idol {
   id: string; name: string; emoji: string; color: string;
   era: string; fandom: string; members: string[]; lightColor: string;
@@ -611,6 +626,9 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
     const event = savedEvent != null ? EVENTS.find(e => e.id === savedEvent) : null;
     const days = event ? getDays(event.date) : null;
     const idol = event ? getIdol(event.idol) : null;
+    // Affiliated ticket search links (Sovrn auto-affiliates these domains at click time).
+    const vividUrl = event ? buildTicketSearchUrl("vivid seats", event.artist) : null;
+    const stubhubUrl = event ? buildTicketSearchUrl("stubhub", event.artist) : null;
     return (
       <div style={{overflowY:"auto",paddingBottom:90}}>
         <div style={{padding:"52px 22px 16px"}}>
@@ -656,14 +674,18 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
                   {days != null && days <= 14 && <span style={{fontSize:9,padding:"2px 8px",borderRadius:18,background:"rgba(239,68,68,.12)",color:"#ef4444",fontFamily:"'Space Mono'"}}>⚡ {days}d left</span>}
                 </div>
                 <div style={{display:"flex",gap:7}}>
-                  <a href={event.ticketUrl} target="_blank" rel="noopener noreferrer" style={{flex:1}}>
-                    <button className="tap" style={{width:"100%",padding:"11px",borderRadius:13,border:"none",background:`linear-gradient(135deg,${idol?.color ?? "#7c3aed"},${idol?.color ?? "#7c3aed"}88)`,color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Space Mono'"}}>
-                      Buy Tickets ↗ {event.price}
+                  {typeof vividUrl === "string" && /^https?:\/\//i.test(vividUrl) && (
+                  <a href={vividUrl} target="_blank" rel="noopener noreferrer" style={{flex:1}}>
+                    <button className="tap" style={{width:"100%",padding:"11px",borderRadius:13,border:"none",background:buyGradient,color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Space Mono'",boxShadow:`0 6px 20px ${THEME.accent}55`}}>
+                      Get Tickets · Vivid Seats ↗
                     </button>
                   </a>
-                  <a href="https://vividseats.com" target="_blank" rel="noopener noreferrer">
-                    <button className="tap" style={{padding:"11px 13px",borderRadius:13,border:`1px solid ${idol?.color ?? "#7c3aed"}28`,background:`${idol?.color ?? "#7c3aed"}10`,color:idol?.color ?? "#7c3aed",fontSize:11,cursor:"pointer",fontFamily:"'Space Mono'"}}>VividSeats</button>
+                  )}
+                  {typeof stubhubUrl === "string" && /^https?:\/\//i.test(stubhubUrl) && (
+                  <a href={stubhubUrl} target="_blank" rel="noopener noreferrer">
+                    <button className="tap" style={{padding:"11px 13px",borderRadius:13,border:`1px solid ${THEME.accent}40`,background:`${THEME.accent}14`,color:THEME.accent,fontSize:11,cursor:"pointer",fontFamily:"'Space Mono'",whiteSpace:"nowrap"}}>StubHub ↗</button>
                   </a>
+                  )}
                 </div>
               </div>
 
