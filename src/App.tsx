@@ -12,6 +12,7 @@ interface ChatMessage { role: "user" | "assistant"; content: string; }
 interface StyleItem {
   cat: string; name: string; store: string; price: string;
   budget: string; url: string; why: string;
+  searchQuery?: string; // short generic merchant-search term; falls back to name if absent
 }
 interface StyleResult { look: string; vibe: string; items: StyleItem[]; }
 
@@ -415,6 +416,7 @@ export default function FanDrop() {
     {
       "cat": "Category (Top/Bottom/Shoes/Outer/Bag/Accessory)",
       "name": "Specific product name",
+      "searchQuery": "Short 2-4 word generic search term: core garment type + ONE key descriptor (e.g. 'silver chain necklace', 'oversized blazer', 'platform boots'). Broad enough to return results on a mainstream fashion retailer. NO brand names, NO 5+ word phrases, NO niche styling adjectives that over-constrain.",
       "store": "Store name (choose from: ASOS, YesStyle, Zara, H&M, Urban Outfitters, & Other Stories, Mango, SHEIN)",
       "price": "$XX",
       "budget": "Budget dupe store + price (e.g. SHEIN $9)",
@@ -423,7 +425,7 @@ export default function FanDrop() {
     }
   ]
 }
-Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix high street and budget options.`,
+Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix high street and budget options. searchQuery is REQUIRED for every item and must stay short and generic so merchant search actually returns products.`,
           messages: [{role: "user", content: `Create a K-pop fan outfit for: ${prompt}`}],
         }),
       });
@@ -780,7 +782,7 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
             </div>
             {wishlist.map((item, i) => {
               const validUrl = typeof item.url === "string" && /^https?:\/\//i.test(item.url) ? item.url : null;
-              const wishSearch = buildStoreSearchUrl(item.store, item.name);
+              const wishSearch = buildStoreSearchUrl(item.store, item.searchQuery || item.name);
               const buyUrl = wishSearch && /^https?:\/\//i.test(wishSearch) ? wishSearch : validUrl;
               return (
               <div key={i} style={{display:"flex",gap:12,alignItems:"center",padding:"11px 0",borderBottom:"1px solid rgba(255,255,255,.06)"}}>
@@ -860,7 +862,7 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
               const catLabel = typeof item.cat === "string" ? item.cat.toUpperCase() : "";
               const validUrl = typeof item.url === "string" && /^https?:\/\//i.test(item.url) ? item.url : null;
               // Prefer a merchant SEARCH url for the item; fall back to the AI homepage url.
-              const searchUrl = buildStoreSearchUrl(item.store, item.name);
+              const searchUrl = buildStoreSearchUrl(item.store, item.searchQuery || item.name);
               const buyUrl = searchUrl && /^https?:\/\//i.test(searchUrl) ? searchUrl : validUrl;
               return (
                 <div key={i} className="card fade" style={{overflow:"hidden",animationDelay:`${i*.05}s`}}>
@@ -893,7 +895,7 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
                       const budgetStore = item.budget.split(" ")[0];
                       // Dupe lands on the dupe store's search for the same item; unknown
                       // dupe stores keep the existing bare-homepage behavior.
-                      const dupeSearch = buildStoreSearchUrl(budgetStore, item.name);
+                      const dupeSearch = buildStoreSearchUrl(budgetStore, item.searchQuery || item.name);
                       const bs = budgetStore.toLowerCase();
                       const budgetUrl = dupeSearch ?? (bs === "shein" ? "https://shein.com" : bs === "temu" ? "https://temu.com" : bs === "romwe" ? "https://romwe.com" : "https://yesstyle.com");
                       return (
