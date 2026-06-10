@@ -14,6 +14,28 @@ interface StyleItem {
   budget: string; url: string; why: string;
 }
 interface StyleResult { look: string; vibe: string; items: StyleItem[]; }
+
+// Maps a merchant name (case-insensitive) → that store's search-results URL for the
+// given item, so "Buy" links land users on the actual product instead of the bare
+// homepage. Sovrn affiliates these the same way (same merchant domain). Unknown
+// stores return null so callers fall back to the existing homepage link (no breakage).
+const STORE_SEARCH_TEMPLATES: Record<string, string> = {
+  "asos": "https://www.asos.com/search/?q={q}",
+  "zara": "https://www.zara.com/us/en/search?searchTerm={q}",
+  "h&m": "https://www2.hm.com/en_us/search-results.html?q={q}",
+  "shein": "https://www.shein.com/pdsearch/{q}",
+  "urban outfitters": "https://www.urbanoutfitters.com/search?q={q}",
+  "& other stories": "https://www.stories.com/en_usd/search.html?q={q}",
+  "mango": "https://shop.mango.com/us/search?kw={q}",
+  "yesstyle": "https://www.yesstyle.com/en/list.html/search.q-{q}",
+  "uniqlo": "https://www.uniqlo.com/us/en/search?q={q}",
+};
+function buildStoreSearchUrl(store: string, itemName: string): string | null {
+  if (typeof store !== "string" || typeof itemName !== "string") return null;
+  const tpl = STORE_SEARCH_TEMPLATES[store.trim().toLowerCase()];
+  if (!tpl) return null;
+  return tpl.replace("{q}", encodeURIComponent(itemName));
+}
 interface Idol {
   id: string; name: string; emoji: string; color: string;
   era: string; fandom: string; members: string[]; lightColor: string;
@@ -758,6 +780,8 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
             </div>
             {wishlist.map((item, i) => {
               const validUrl = typeof item.url === "string" && /^https?:\/\//i.test(item.url) ? item.url : null;
+              const wishSearch = buildStoreSearchUrl(item.store, item.name);
+              const buyUrl = wishSearch && /^https?:\/\//i.test(wishSearch) ? wishSearch : validUrl;
               return (
               <div key={i} style={{display:"flex",gap:12,alignItems:"center",padding:"11px 0",borderBottom:"1px solid rgba(255,255,255,.06)"}}>
                 <div style={{width:40,height:40,borderRadius:10,background:"rgba(255,255,255,.05)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>👗</div>
@@ -766,7 +790,7 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
                   <div className="sans" style={{fontSize:10,color:"rgba(255,255,255,.35)"}}>{item.store} · {item.price}</div>
                 </div>
                 <div style={{display:"flex",gap:7}}>
-                  {validUrl && <a href={validUrl} target="_blank" rel="noopener noreferrer"><button className="tap" style={{padding:"6px 12px",borderRadius:9,border:"1px solid rgba(192,132,252,.25)",background:"rgba(192,132,252,.1)",color:"#c084fc",fontSize:10,cursor:"pointer",fontFamily:"'Space Mono'"}}>Buy ↗</button></a>}
+                  {buyUrl && <a href={buyUrl} target="_blank" rel="noopener noreferrer"><button className="tap" style={{padding:"6px 12px",borderRadius:9,border:"1px solid rgba(192,132,252,.25)",background:"rgba(192,132,252,.1)",color:"#c084fc",fontSize:10,cursor:"pointer",fontFamily:"'Space Mono'"}}>Buy ↗</button></a>}
                   <button className="tap" onClick={() => toggleWish(item)} style={{padding:"6px 10px",borderRadius:9,border:"1px solid rgba(244,63,94,.2)",background:"rgba(244,63,94,.08)",color:"#f43f5e",fontSize:10,cursor:"pointer"}}>×</button>
                 </div>
               </div>
@@ -835,6 +859,9 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
               const inWish = wishlist.find(x => x.name === item.name);
               const catLabel = typeof item.cat === "string" ? item.cat.toUpperCase() : "";
               const validUrl = typeof item.url === "string" && /^https?:\/\//i.test(item.url) ? item.url : null;
+              // Prefer a merchant SEARCH url for the item; fall back to the AI homepage url.
+              const searchUrl = buildStoreSearchUrl(item.store, item.name);
+              const buyUrl = searchUrl && /^https?:\/\//i.test(searchUrl) ? searchUrl : validUrl;
               return (
                 <div key={i} className="card fade" style={{overflow:"hidden",animationDelay:`${i*.05}s`}}>
                   <div style={{height:2,background:heroGradient}}/>
@@ -857,14 +884,18 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
                     </button>
                   </div>
                   <div style={{padding:"0 13px 12px",display:"flex",gap:8}}>
-                    {validUrl && (
-                    <a href={validUrl} target="_blank" rel="noopener noreferrer" style={{flex:1}}>
+                    {buyUrl && (
+                    <a href={buyUrl} target="_blank" rel="noopener noreferrer" style={{flex:1}}>
                       <button className="tap" style={{width:"100%",padding:"10px",borderRadius:12,border:"none",background:buyGradient,color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Space Mono'",boxShadow:`0 6px 20px ${THEME.accent}55`}}>Buy at {item.store} ↗</button>
                     </a>
                     )}
                     {item.budget && (() => {
-                      const budgetStore = item.budget.split(" ")[0].toLowerCase();
-                      const budgetUrl = budgetStore === "shein" ? "https://shein.com" : budgetStore === "temu" ? "https://temu.com" : budgetStore === "romwe" ? "https://romwe.com" : "https://yesstyle.com";
+                      const budgetStore = item.budget.split(" ")[0];
+                      // Dupe lands on the dupe store's search for the same item; unknown
+                      // dupe stores keep the existing bare-homepage behavior.
+                      const dupeSearch = buildStoreSearchUrl(budgetStore, item.name);
+                      const bs = budgetStore.toLowerCase();
+                      const budgetUrl = dupeSearch ?? (bs === "shein" ? "https://shein.com" : bs === "temu" ? "https://temu.com" : bs === "romwe" ? "https://romwe.com" : "https://yesstyle.com");
                       return (
                         <a href={budgetUrl} target="_blank" rel="noopener noreferrer">
                           <button className="tap" style={{padding:"10px 13px",borderRadius:12,border:"1px solid rgba(34,197,94,.25)",background:"rgba(34,197,94,.08)",color:"#22c55e",fontSize:11,cursor:"pointer",fontFamily:"'Space Mono'",whiteSpace:"nowrap"}}>💚 Dupe</button>
