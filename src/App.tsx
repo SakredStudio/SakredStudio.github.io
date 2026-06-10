@@ -526,9 +526,8 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
     return (
       <div style={{overflowY:"auto",paddingBottom:90}}>
         <div style={{padding:"52px 22px 20px",position:"relative"}}>
-          <div style={{position:"absolute",top:0,left:0,right:0,height:220,background:`radial-gradient(ellipse at 70% -10%,${anchor}18 0%,transparent 70%)`,pointerEvents:"none"}}/>
           <Lbl>Your K-Pop Universe</Lbl>
-          <div className="h1 gradient-text" style={{fontSize:44,marginBottom:6,background:heroGradient}}>{APP_NAME}</div>
+          <div className="h1" style={{fontSize:44,marginBottom:6,display:"inline-block",backgroundImage:heroGradient,WebkitBackgroundClip:"text",backgroundClip:"text",WebkitTextFillColor:"transparent",color:"transparent"}}>{APP_NAME}</div>
           <div className="sans" style={{fontSize:13,color:"rgba(255,255,255,.38)",lineHeight:1.6}}>Concerts · Drops · Fan Tools · AI Fandom Assistant</div>
           <div style={{display:"flex",gap:8,marginTop:14,flexWrap:"wrap"}}>
             {myIdolData.map(idol => (
@@ -826,7 +825,6 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
       )}
 
       <div style={{padding:"52px 22px 14px",position:"relative"}}>
-        <div style={{position:"absolute",top:0,left:0,right:0,height:200,background:"radial-gradient(ellipse at 30% 0%,rgba(236,72,153,.12),transparent 70%)",pointerEvents:"none"}}/>
         <Lbl>AI-Powered · Affiliate Commerce</Lbl>
         <div className="h1" style={{fontSize:28,marginBottom:4}}>AI Style<br/>Finder</div>
         <div className="sans" style={{fontSize:12,color:"rgba(255,255,255,.38)",lineHeight:1.65}}>Describe any K-pop look → get shoppable outfit recommendations with real purchase links and budget dupes.</div>
@@ -839,7 +837,7 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
 
       <div style={{padding:"0 20px 16px"}}>
         <Lbl style={{marginBottom:9}}>Base it on a group's style</Lbl>
-        <div className="hrow" style={{marginBottom:14}}>
+        <div className="hrow" style={{marginBottom:14,flexWrap:"wrap"}}>
           {IDOLS.slice(0, 6).map(idol => (
             <button key={idol.id} className="tap pill" onClick={() => setStyleIdol(idol.id)} style={{flexShrink:0,background:styleIdol === idol.id ? `${idol.color}20` : "rgba(255,255,255,.04)",color:styleIdol === idol.id ? idol.color : "rgba(255,255,255,.3)",border:`1px solid ${styleIdol === idol.id ? idol.color+"44" : "rgba(255,255,255,.07)"}`}}>
               {idol.emoji} {idol.name}
@@ -962,7 +960,7 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
       "What is the difference between Melon and Spotify charts?",
     ];
     return (
-      <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 60px - env(safe-area-inset-bottom, 0px))"}}>
+      <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 92px - env(safe-area-inset-bottom, 8px))"}}>
         <div style={{padding:"52px 22px 16px",borderBottom:"1px solid rgba(255,255,255,.06)",flexShrink:0}}>
           <div style={{display:"flex",gap:12,alignItems:"center"}}>
             <div style={{width:46,height:46,borderRadius:14,background:heroGradient,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>🤖</div>
@@ -1013,7 +1011,7 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
           <div ref={aiEndRef}/>
         </div>
 
-        <div style={{flexShrink:0,padding:"12px 16px 16px",borderTop:"1px solid rgba(255,255,255,.06)",background:"rgba(6,4,14,.97)",backdropFilter:"blur(20px)"}}>
+        <div style={{flexShrink:0,padding:"12px 16px 16px",borderTop:"1px solid rgba(255,255,255,.06)",background:"rgba(6,4,14,.97)",backdropFilter:"blur(20px)",position:"relative",zIndex:2}}>
           <div style={{display:"flex",gap:9,alignItems:"flex-end"}}>
             <div style={{flex:1,borderRadius:16,background:"rgba(255,255,255,.07)",border:"1px solid rgba(255,255,255,.1)",padding:"11px 14px"}}>
               <textarea value={aiInput} onChange={e => setAiInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendAiMessage(); } }} placeholder="Ask FANI anything K-pop…" rows={1} style={{width:"100%",background:"none",border:"none",color:THEME.text,fontSize:13,resize:"none",outline:"none",lineHeight:1.5}}/>
@@ -1022,7 +1020,7 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
               {aiMode === "loading" ? <div className="spin" style={{width:16,height:16,border:"2px solid rgba(255,255,255,.3)",borderTopColor:"#fff",borderRadius:"50%"}}/> : "↑"}
             </button>
           </div>
-          <div className="sans" style={{marginTop:7,fontSize:9,color:"rgba(255,255,255,.18)",textAlign:"center"}}>FANI is an AI — always verify critical info. Affiliate links throughout the app.</div>
+          <div className="sans" style={{marginTop:7,fontSize:9,color:"rgba(255,255,255,.45)",textAlign:"center"}}>FANI is an AI — always verify critical info. Affiliate links throughout the app.</div>
         </div>
       </div>
     );
@@ -1038,7 +1036,7 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
           <div className="h1" style={{fontSize:28}}>Fan Hub</div>
         </div>
 
-        <div style={{overflowX:"auto",display:"flex",gap:8,padding:"0 20px 18px"}}>
+        <div style={{display:"flex",flexWrap:"wrap",gap:8,padding:"0 20px 18px"}}>
           {([
             {id:"fancard",label:"🪪 Fan Card"},
             {id:"fanchant",label:"🎤 Fanchants"},
@@ -1096,7 +1094,7 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
             </div>
 
             <Lbl style={{marginBottom:8}}>Ultimate bias group</Lbl>
-            <div className="hrow" style={{marginBottom:14}}>
+            <div className="hrow" style={{marginBottom:14,flexWrap:"wrap"}}>
               {IDOLS.map(idol => (
                 <button key={idol.id} className="tap pill" onClick={() => setFanBias(idol.id)} style={{flexShrink:0,background:fanBias === idol.id ? `${idol.color}20` : "rgba(255,255,255,.04)",color:fanBias === idol.id ? idol.color : "rgba(255,255,255,.3)",border:`1px solid ${fanBias === idol.id ? idol.color+"44" : "rgba(255,255,255,.07)"}`}}>
                   {idol.emoji} {idol.name}
@@ -1270,7 +1268,9 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
       </div>
 
       <div style={{width:"100%",maxWidth:430,minHeight:"100vh",display:"flex",flexDirection:"column",position:"relative"}}>
-        <div style={{flex:1,overflow:"hidden"}}>
+        {/* Shared anchor-tinted backdrop behind ALL views (driven by bias-group color) */}
+        <div style={{position:"absolute",top:0,left:0,right:0,height:240,background:`radial-gradient(ellipse at 70% -10%,${anchor}18 0%,transparent 70%)`,pointerEvents:"none",zIndex:0}}/>
+        <div style={{flex:1,overflow:"hidden",position:"relative",zIndex:1}}>
           {tab === "home"   && renderHome()}
           {tab === "events" && renderEvents()}
           {tab === "drops"  && renderDrops()}
