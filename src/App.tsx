@@ -25,9 +25,9 @@ const STORE_SEARCH_TEMPLATES: Record<string, string> = {
   "h&m": "https://www2.hm.com/en_us/search-results.html?q={q}",
   "shein": "https://www.shein.com/pdsearch/{q}",
   "urban outfitters": "https://www.urbanoutfitters.com/search?q={q}",
-  "& other stories": "https://www.stories.com/en_usd/search.html?q={q}",
-  "mango": "https://shop.mango.com/us/search?kw={q}",
-  "yesstyle": "https://www.yesstyle.com/en/list.html/search.q-{q}",
+  "& other stories": "https://www.stories.com/en-ww/search/?q={q}",
+  "mango": "https://shop.mango.com/us/en/search/women?q={q}",
+  "yesstyle": "https://www.yesstyle.com/en/list.html?q={q}&bpt=48",
   "uniqlo": "https://www.uniqlo.com/us/en/search?q={q}",
 };
 function buildStoreSearchUrl(store: string, itemName: string): string | null {
