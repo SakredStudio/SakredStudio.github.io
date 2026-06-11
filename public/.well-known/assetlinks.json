@@ -1,0 +1,10 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.sakredstudio.swaiyu",
+      "sha256_cert_fingerprints": ["BE:CC:4E:9F:95:97:3B:EA:7A:82:C4:9F:E1:E5:F9:31:03:CD:30:B7:89:0C:60:DA:7B:70:F9:1E:85:06:D1:75"]
+    }
+  }
+]
