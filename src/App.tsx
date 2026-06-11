@@ -1343,6 +1343,12 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
             )}
           </div>
         )}
+
+        {/* Fan Hub footer */}
+        <div style={{padding:"8px 20px 30px",textAlign:"center"}}>
+          <a href="/privacy.html" target="_blank" rel="noopener noreferrer" className="sans" style={{fontSize:11,color:"rgba(255,255,255,.4)",textDecoration:"underline"}}>Privacy Policy</a>
+          <div className="sans" style={{fontSize:10,color:"rgba(255,255,255,.18)",marginTop:6}}>Swaiyu · Sakred Studio</div>
+        </div>
       </div>
     );
   };
