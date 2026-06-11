@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { KPOP_GROUPS, CUSTOM_PALETTE, slugify, type CatalogGroup, type GroupTier } from "./kpopGroups";
 
 /* ═══════════════════════════════════════════════════════
    TYPES
@@ -227,7 +228,46 @@ const BUDGET_TIPS = [
 const getDays = (d: string): number =>
   Math.ceil((new Date(d).getTime() - Date.now()) / 86400000);
 
-const getIdol = (id: string): Idol | undefined => IDOLS.find(i => i.id === id);
+/* ── GROUP RESOLVER ───────────────────────────────────────────────────────────
+   One lookup across featured (IDOLS) → catalog (KPOP_GROUPS) → custom (user-added).
+   Catalog/custom groups are normalised into the Idol shape (era/members/lightColor
+   are never rendered, so empty defaults are safe), so every existing consumer keeps
+   working through the same getIdol() call site. */
+const toIdol = (g: CatalogGroup): Idol => ({
+  id: g.id, name: g.name, emoji: g.emoji, color: g.color,
+  era: "", fandom: g.fandom, members: [], lightColor: g.color,
+});
+
+// Featured tier mirrored from IDOLS so the picker can show all tiers in one list.
+const FEATURED_CATALOG: CatalogGroup[] = IDOLS.map(i => ({
+  id: i.id, name: i.name, fandom: i.fandom, emoji: i.emoji, color: i.color, tier: "featured" as GroupTier,
+}));
+// Full browsable catalog (featured first, then popular, then more).
+const FULL_CATALOG: CatalogGroup[] = [...FEATURED_CATALOG, ...KPOP_GROUPS];
+
+const CATALOG_BY_ID = new Map<string, Idol>();
+IDOLS.forEach(i => CATALOG_BY_ID.set(i.id, i));
+KPOP_GROUPS.forEach(g => CATALOG_BY_ID.set(g.id, toIdol(g)));
+
+// Registry for user-added custom groups, kept in sync with fandrop_customGroups so
+// getIdol() can resolve them even when called during render.
+const customRegistry = new Map<string, Idol>();
+const registerCustom = (g: Idol) => customRegistry.set(g.id, g);
+
+const getIdol = (id: string): Idol | undefined =>
+  CATALOG_BY_ID.get(id) ?? customRegistry.get(id);
+
+const loadCustomGroups = (): Idol[] => {
+  try {
+    const raw: unknown = JSON.parse(localStorage.getItem("fandrop_customGroups") || "[]");
+    if (!Array.isArray(raw)) return [];
+    const groups = raw
+      .filter((g): g is Idol => !!g && typeof g.id === "string" && typeof g.name === "string")
+      .map(g => ({ ...g, era: "", members: [], lightColor: g.color || THEME.primary }));
+    groups.forEach(registerCustom);
+    return groups;
+  } catch { return []; }
+};
 
 const hexToRgb = (hex: string): string => {
   const parts = hex.replace("#", "").match(/../g);
@@ -277,6 +317,10 @@ const ColorBar = ({color}: {color: string}) =>
 export default function FanDrop() {
   const [tab, setTab] = useState<TabId>("home");
   const [myIdols, setMyIdols] = useState<string[]>(loadIdols);
+  const [customGroups, setCustomGroups] = useState<Idol[]>(loadCustomGroups);
+  const [showPicker, setShowPicker] = useState(false);
+  const [pickerSearch, setPickerSearch] = useState("");
+  const [customInput, setCustomInput] = useState("");
   const [savedEvent, setSavedEvent] = useState<number | null>(loadSavedEvent);
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>(loadChecked);
   const [openFanchant, setOpenFanchant] = useState<number | null>(null);
@@ -290,14 +334,14 @@ export default function FanDrop() {
   const aiEndRef = useRef<HTMLDivElement>(null);
   // Style AI
   const [stylePrompt, setStylePrompt] = useState("");
-  const [styleIdol, setStyleIdol] = useState("bts");
+  const [styleIdol, setStyleIdol] = useState(() => loadIdols()[0] ?? "bts");
   const [styleMode, setStyleMode] = useState<AiMode>("idle");
   const [styleResults, setStyleResults] = useState<StyleResult | null>(null);
   const [wishlist, setWishlist] = useState<StyleItem[]>(loadWishlist);
   const [showWishlist, setShowWishlist] = useState(false);
   // Fan Card
   const [fanName, setFanName] = useState("");
-  const [fanBias, setFanBias] = useState("bts");
+  const [fanBias, setFanBias] = useState(() => loadIdols()[0] ?? "bts");
   const [fanSince, setFanSince] = useState("2020");
   const [fanPhoto, setFanPhoto] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -322,6 +366,39 @@ export default function FanDrop() {
       localStorage.setItem("fandrop_idols", JSON.stringify(next));
       return next;
     });
+  };
+
+  // Add a free-text group. If the name matches a featured/catalog/custom entry
+  // (case-insensitive) we toggle THAT entry on instead of creating a duplicate.
+  const addCustomGroup = () => {
+    const name = customInput.trim().replace(/\s+/g, " ").slice(0, 40);
+    if (!name) return;
+    const lc = name.toLowerCase();
+    const existing = FULL_CATALOG.find(g => g.name.toLowerCase() === lc)
+      ?? customGroups.find(g => g.name.toLowerCase() === lc);
+    if (existing) {
+      setCustomInput("");
+      if (!myIdols.includes(existing.id)) { toggleIdol(existing.id); pushToast(`Added ${existing.name} 💜`); }
+      else pushToast(`${existing.name} is already in your groups`);
+      return;
+    }
+    let id = "c_" + slugify(name);
+    if (CATALOG_BY_ID.has(id) || customRegistry.has(id)) id = `${id}-${customGroups.length}`;
+    const color = CUSTOM_PALETTE[customGroups.length % CUSTOM_PALETTE.length];
+    const group: Idol = { id, name, emoji: "🎤", color, era: "", fandom: "FAN", members: [], lightColor: color };
+    registerCustom(group);
+    setCustomGroups(prev => {
+      const next = [...prev, group];
+      localStorage.setItem("fandrop_customGroups", JSON.stringify(next));
+      return next;
+    });
+    setMyIdols(prev => {
+      const next = prev.includes(id) ? prev : [...prev, id];
+      localStorage.setItem("fandrop_idols", JSON.stringify(next));
+      return next;
+    });
+    setCustomInput("");
+    pushToast(`Added ${name} 🎤`);
   };
 
   const myIdolData = myIdols.map(id => getIdol(id)).filter((x): x is Idol => !!x);
@@ -536,7 +613,7 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
                 <span style={{fontSize:11,fontWeight:700,color:idol.color,fontFamily:"'Space Mono'"}}>{idol.name}</span>
               </div>
             ))}
-            <div className="tap" onClick={() => setTab("fan")} style={{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:20,background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.07)",cursor:"pointer"}}>
+            <div className="tap" onClick={() => setShowPicker(true)} style={{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:20,background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.07)",cursor:"pointer"}}>
               <span style={{fontSize:11,color:"rgba(255,255,255,.3)"}}>+ Edit</span>
             </div>
           </div>
@@ -580,8 +657,13 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
             })}
           </div>
         ) : (
-          <div style={{margin:"0 20px 18px",padding:"16px",borderRadius:16,background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.07)",textAlign:"center"}}>
-            <div className="sans" style={{fontSize:12,color:"rgba(255,255,255,.3)"}}>No drops for your groups yet — check back soon!</div>
+          <div className="tap" onClick={() => setTab("fani")} style={{margin:"0 20px 18px",padding:"16px 18px",borderRadius:16,background:"linear-gradient(135deg,rgba(124,58,237,.12),rgba(244,114,182,.06))",border:"1px solid rgba(192,132,252,.2)",display:"flex",gap:13,alignItems:"center"}}>
+            <div style={{fontSize:26,flexShrink:0}}>✨</div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:13,fontWeight:700,marginBottom:2}}>No tracked drops for your groups yet</div>
+              <div className="sans" style={{fontSize:11,color:"rgba(255,255,255,.45)",lineHeight:1.5}}>Ask FANI what's new with your groups →</div>
+            </div>
+            <div style={{fontSize:18,color:"rgba(255,255,255,.2)"}}>›</div>
           </div>
         )}
 
@@ -838,11 +920,12 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
       <div style={{padding:"0 20px 16px"}}>
         <Lbl style={{marginBottom:9}}>Base it on a group's style</Lbl>
         <div className="hrow" style={{marginBottom:14,flexWrap:"wrap"}}>
-          {IDOLS.slice(0, 6).map(idol => (
+          {myIdolData.map(idol => (
             <button key={idol.id} className="tap pill" onClick={() => setStyleIdol(idol.id)} style={{flexShrink:0,background:styleIdol === idol.id ? `${idol.color}20` : "rgba(255,255,255,.04)",color:styleIdol === idol.id ? idol.color : "rgba(255,255,255,.3)",border:`1px solid ${styleIdol === idol.id ? idol.color+"44" : "rgba(255,255,255,.07)"}`}}>
               {idol.emoji} {idol.name}
             </button>
           ))}
+          <button className="tap pill" onClick={() => setShowPicker(true)} style={{flexShrink:0,background:"rgba(255,255,255,.04)",color:"rgba(255,255,255,.3)",border:"1px solid rgba(255,255,255,.07)"}}>+ Groups</button>
         </div>
 
         <Lbl style={{marginBottom:9}}>Quick style presets</Lbl>
@@ -1095,11 +1178,12 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
 
             <Lbl style={{marginBottom:8}}>Ultimate bias group</Lbl>
             <div className="hrow" style={{marginBottom:14,flexWrap:"wrap"}}>
-              {IDOLS.map(idol => (
+              {myIdolData.map(idol => (
                 <button key={idol.id} className="tap pill" onClick={() => setFanBias(idol.id)} style={{flexShrink:0,background:fanBias === idol.id ? `${idol.color}20` : "rgba(255,255,255,.04)",color:fanBias === idol.id ? idol.color : "rgba(255,255,255,.3)",border:`1px solid ${fanBias === idol.id ? idol.color+"44" : "rgba(255,255,255,.07)"}`}}>
                   {idol.emoji} {idol.name}
                 </button>
               ))}
+              <button className="tap pill" onClick={() => setShowPicker(true)} style={{flexShrink:0,background:"rgba(255,255,255,.04)",color:"rgba(255,255,255,.3)",border:"1px solid rgba(255,255,255,.07)"}}>+ Groups</button>
             </div>
 
             <Lbl style={{marginBottom:8}}>Stan since</Lbl>
@@ -1236,24 +1320,100 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
         {/* MY GROUPS */}
         {fanSection === "mygroups" && (
           <div style={{padding:"0 20px",paddingBottom:24}}>
-            <div className="sans" style={{fontSize:12,color:"rgba(255,255,255,.4)",lineHeight:1.7,marginBottom:16}}>Your personalised feed, drops, and fanchants are based on the groups you follow.</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-              {IDOLS.map(idol => {
-                const sel = myIdols.includes(idol.id);
-                return (
-                  <div key={idol.id} className="tap" onClick={() => { toggleIdol(idol.id); pushToast(sel ? `Removed ${idol.name}` : `Added ${idol.name} 💜`); }}
-                    style={{borderRadius:16,border:`1.5px solid ${sel ? idol.color+"55" : "rgba(255,255,255,.07)"}`,background:sel ? `${idol.color}12` : "rgba(255,255,255,.03)",padding:"14px 13px",transition:"all .2s"}}>
+            <div className="sans" style={{fontSize:12,color:"rgba(255,255,255,.4)",lineHeight:1.7,marginBottom:16}}>Your personalised feed, drops, and fanchants are based on the groups you follow. Browse 100+ groups or add your own.</div>
+            <button className="tap" onClick={() => setShowPicker(true)} style={{width:"100%",padding:"14px",borderRadius:14,border:"none",background:heroGradient,color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Syne'",letterSpacing:"-.01em",marginBottom:18}}>
+              🔍 Browse & Add Groups
+            </button>
+            <Lbl style={{marginBottom:10}}>Following ({myIdolData.length})</Lbl>
+            {myIdolData.length > 0 ? (
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                {myIdolData.map(idol => (
+                  <div key={idol.id} className="tap" onClick={() => { toggleIdol(idol.id); pushToast(`Removed ${idol.name}`); }}
+                    style={{borderRadius:16,border:`1.5px solid ${idol.color}55`,background:`${idol.color}12`,padding:"14px 13px",transition:"all .2s",position:"relative"}}>
+                    <div style={{position:"absolute",top:10,right:11,fontSize:13,color:"rgba(255,255,255,.3)"}}>×</div>
                     <div style={{fontSize:24,marginBottom:6}}>{idol.emoji}</div>
-                    <div style={{fontSize:12,fontWeight:700,marginBottom:1}}>{idol.name}</div>
+                    <div style={{fontSize:12,fontWeight:700,marginBottom:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{idol.name}</div>
                     <div className="sans" style={{fontSize:10,color:"rgba(255,255,255,.35)",marginBottom:6}}>{idol.fandom}</div>
-                    {sel && <div style={{width:"100%",height:2,borderRadius:1,background:idol.color}}/>}
-                    {!sel && <div className="sans" style={{fontSize:10,color:"rgba(255,255,255,.2)"}}>Tap to follow</div>}
+                    <div style={{width:"100%",height:2,borderRadius:1,background:idol.color}}/>
                   </div>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="sans" style={{textAlign:"center",padding:"20px 0",fontSize:12,color:"rgba(255,255,255,.3)"}}>No groups yet — tap "Browse & Add Groups" to start.</div>
+            )}
           </div>
         )}
+      </div>
+    );
+  };
+
+  // ── GROUP PICKER (modal — reachable from Home "+ Edit" and Fan Hub) ───────────
+  const groupCard = (g: {id: string; name: string; emoji: string; color: string; fandom: string}) => {
+    const sel = myIdols.includes(g.id);
+    return (
+      <div key={g.id} className="tap" onClick={() => { toggleIdol(g.id); pushToast(sel ? `Removed ${g.name}` : `Added ${g.name} 💜`); }}
+        style={{borderRadius:14,border:`1.5px solid ${sel ? g.color+"66" : "rgba(255,255,255,.08)"}`,background:sel ? `${g.color}14` : "rgba(255,255,255,.03)",padding:"11px 12px",transition:"all .18s",display:"flex",alignItems:"center",gap:10}}>
+        <span style={{fontSize:20,flexShrink:0}}>{g.emoji}</span>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:12,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{g.name}</div>
+          <div className="sans" style={{fontSize:9.5,color:"rgba(255,255,255,.35)"}}>{g.fandom}</div>
+        </div>
+        <div style={{width:18,height:18,borderRadius:6,border:`1.5px solid ${sel ? g.color : "rgba(255,255,255,.2)"}`,background:sel ? g.color : "transparent",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:THEME.bg,flexShrink:0}}>{sel ? "✓" : ""}</div>
+      </div>
+    );
+  };
+
+  const renderPicker = () => {
+    if (!showPicker) return null;
+    const s = pickerSearch.trim().toLowerCase();
+    const customAsCards = customGroups.map(c => ({id:c.id, name:c.name, emoji:c.emoji, color:c.color, fandom:c.fandom}));
+    const matches = s
+      ? [...FULL_CATALOG, ...customAsCards].filter(g => g.name.toLowerCase().includes(s) || g.fandom.toLowerCase().includes(s))
+      : null;
+    const popular = FULL_CATALOG.filter(g => g.tier === "featured" || g.tier === "popular");
+    const more = FULL_CATALOG.filter(g => g.tier === "more");
+    const close = () => { setShowPicker(false); setPickerSearch(""); };
+    const grid = (items: {id: string; name: string; emoji: string; color: string; fandom: string}[]) =>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9,marginBottom:16}}>{items.map(groupCard)}</div>;
+    return (
+      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",backdropFilter:"blur(10px)",zIndex:700,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={close}>
+        <div className="fade" style={{width:"100%",maxWidth:430,background:"#0c0718",borderRadius:"22px 22px 0 0",border:"1px solid rgba(255,255,255,.08)",padding:"18px 18px 36px",maxHeight:"86vh",display:"flex",flexDirection:"column"}} onClick={e => e.stopPropagation()}>
+          <div style={{width:36,height:4,borderRadius:2,background:"rgba(255,255,255,.12)",margin:"0 auto 16px",flexShrink:0}}/>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexShrink:0}}>
+            <div style={{fontSize:16,fontWeight:700,fontFamily:"'Syne'"}}>Your Groups <span style={{color:anchor}}>({myIdols.length})</span></div>
+            <button className="tap" onClick={close} style={{background:"none",border:"none",color:"rgba(255,255,255,.35)",fontSize:20,cursor:"pointer"}}>×</button>
+          </div>
+          <div style={{borderRadius:12,background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",padding:"10px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:9,flexShrink:0}}>
+            <span style={{fontSize:14,opacity:.5}}>🔍</span>
+            <input value={pickerSearch} onChange={e => setPickerSearch(e.target.value)} placeholder="Search 100+ groups by name or fandom" style={{width:"100%",background:"none",border:"none",color:THEME.text,fontSize:13,outline:"none"}}/>
+          </div>
+
+          <div style={{overflowY:"auto",flex:1,minHeight:0}}>
+            {matches ? (
+              matches.length > 0 ? grid(matches) : (
+                <div className="sans" style={{textAlign:"center",padding:"24px 0",fontSize:12,color:"rgba(255,255,255,.3)"}}>No groups found for "{pickerSearch.trim()}" — add it as a custom group below ↓</div>
+              )
+            ) : (
+              <>
+                <Lbl style={{marginBottom:9}}>⭐ Popular</Lbl>
+                {grid(popular)}
+                {customAsCards.length > 0 && <><Lbl style={{marginBottom:9}}>🎤 Your Custom Groups</Lbl>{grid(customAsCards)}</>}
+                <Lbl style={{marginBottom:9}}>More Groups</Lbl>
+                {grid(more)}
+              </>
+            )}
+          </div>
+
+          <div style={{borderTop:"1px solid rgba(255,255,255,.08)",paddingTop:14,marginTop:4,flexShrink:0}}>
+            <Lbl style={{marginBottom:8}}>Can't find your group? Add it →</Lbl>
+            <div style={{display:"flex",gap:8}}>
+              <div style={{flex:1,borderRadius:12,background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",padding:"10px 14px"}}>
+                <input value={customInput} onChange={e => setCustomInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter") addCustomGroup(); }} maxLength={40} placeholder="e.g. your local group" style={{width:"100%",background:"none",border:"none",color:THEME.text,fontSize:13,outline:"none"}}/>
+              </div>
+              <button className="tap" onClick={addCustomGroup} disabled={!customInput.trim()} style={{padding:"0 18px",borderRadius:12,border:"none",background:customInput.trim() ? heroGradient : "rgba(255,255,255,.07)",color:customInput.trim() ? "#fff" : "rgba(255,255,255,.25)",fontSize:13,fontWeight:700,cursor:customInput.trim() ? "pointer" : "default",fontFamily:"'Syne'"}}>Add</button>
+            </div>
+          </div>
+        </div>
       </div>
     );
   };
@@ -1266,6 +1426,8 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
       <div className="toast-wrap">
         {toasts.map(t => <div key={t.id} className="toast">{t.msg}</div>)}
       </div>
+
+      {renderPicker()}
 
       <div style={{width:"100%",maxWidth:430,minHeight:"100vh",display:"flex",flexDirection:"column",position:"relative"}}>
         {/* Shared anchor-tinted backdrop behind ALL views (driven by bias-group color) */}
