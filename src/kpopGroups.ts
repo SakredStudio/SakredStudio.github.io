@@ -88,12 +88,12 @@ const RAW: RawGroup[] = [
   { name: "CRAVITY",         fandom: "LUVITY",     emoji: "⚡", color: "#f59e0b", tier: "more" },
   { name: "EPEX",            fandom: "ZENITH",     emoji: "🗻", color: "#34d399", tier: "more" },
   { name: "xikers",          fandom: "ROADY",      emoji: "🛼", color: "#fb7185", tier: "more" },
-  { name: "NCT WISH",        fandom: "FAN",        emoji: "⭐", color: "#22c55e", tier: "more" }, // VERIFY
-  { name: "82MAJOR",         fandom: "FAN",        emoji: "🎙️", color: "#94a3b8", tier: "more" }, // VERIFY
+  { name: "NCT WISH",        fandom: "WISH",       emoji: "⭐", color: "#22c55e", tier: "more" },
+  { name: "82MAJOR",         fandom: "MAJOR",      emoji: "🎙️", color: "#94a3b8", tier: "more" },
   { name: "Xdinary Heroes",  fandom: "XENO",       emoji: "🎸", color: "#ef4444", tier: "more" },
   { name: "n.SSign",         fandom: "FAN",        emoji: "✴️", color: "#38bdf8", tier: "more" }, // VERIFY
   { name: "AMPERS&ONE",      fandom: "FAN",        emoji: "🔣", color: "#a78bfa", tier: "more" }, // VERIFY
-  { name: "TEMPEST",         fandom: "FAN",        emoji: "🌪️", color: "#22d3ee", tier: "more" }, // VERIFY
+  { name: "TEMPEST",         fandom: "STORM",      emoji: "🌪️", color: "#22d3ee", tier: "more" },
 
   // ── MORE (girl groups) ─────────────────────────────────────────────────────
   { name: "Kep1er",          fandom: "Kep1ian",    emoji: "💎", color: "#f472b6", tier: "more" },
@@ -112,7 +112,7 @@ const RAW: RawGroup[] = [
   { name: "H1-KEY",          fandom: "FAN",        emoji: "🔑", color: "#f59e0b", tier: "more" }, // VERIFY
   { name: "FIFTY FIFTY",     fandom: "FAN",        emoji: "🪙", color: "#fb7185", tier: "more" }, // VERIFY
   { name: "CSR",             fandom: "FAN",        emoji: "🌸", color: "#f472b6", tier: "more" }, // VERIFY
-  { name: "UNIS",            fandom: "FAN",        emoji: "🌐", color: "#38bdf8", tier: "more" }, // VERIFY
+  { name: "UNIS",            fandom: "UNIVERSE",   emoji: "🌐", color: "#38bdf8", tier: "more" },
   { name: "RESCENE",         fandom: "FAN",        emoji: "🎬", color: "#ec4899", tier: "more" }, // VERIFY
   { name: "MEOVV",           fandom: "FAN",        emoji: "🐱", color: "#a78bfa", tier: "more" }, // VERIFY
   { name: "izna",            fandom: "FAN",        emoji: "❄️", color: "#22d3ee", tier: "more" }, // VERIFY
