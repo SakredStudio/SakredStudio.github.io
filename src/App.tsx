@@ -129,12 +129,25 @@ const IDOLS: Idol[] = [
 ];
 
 const EVENTS = [
-  {id:1,artist:"BTS",tour:"Grand Chapter World Tour",date:"2026-10-11",venue:"Rose Bowl, Pasadena",country:"🇺🇸",price:"From $198",idol:"bts",ticketUrl:"https://seatgeek.com"},
-  {id:2,artist:"BLACKPINK",tour:"BORN PINK Encore",date:"2026-09-05",venue:"Madison Square Garden, NYC",country:"🇺🇸",price:"From $124",idol:"bp",ticketUrl:"https://ticketmaster.com"},
-  {id:3,artist:"Stray Kids",tour:"DOMINATE World Tour",date:"2026-08-14",venue:"SoFi Stadium, LA",country:"🇺🇸",price:"From $89",idol:"skz",ticketUrl:"https://seatgeek.com"},
-  {id:4,artist:"aespa",tour:"SYNK: PARALLEL LINE",date:"2026-07-19",venue:"The Forum, Inglewood",country:"🇺🇸",price:"From $75",idol:"aespa",ticketUrl:"https://ticketmaster.com"},
-  {id:5,artist:"SEVENTEEN",tour:"RIGHT HERE World Tour",date:"2026-08-30",venue:"Allegiant Stadium, Las Vegas",country:"🇺🇸",price:"From $79",idol:"svt",ticketUrl:"https://seatgeek.com"},
-  {id:6,artist:"NewJeans",tour:"BUNNIES CAMP 2026",date:"2026-11-01",venue:"United Center, Chicago",country:"🇺🇸",price:"From $88",idol:"nj",ticketUrl:"https://interpark.com"},
+  // ids 1–6: original Americas legs (region added; ids/order untouched so saved-event localStorage stays valid)
+  {id:1,artist:"BTS",tour:"Grand Chapter World Tour",date:"2026-10-11",venue:"Rose Bowl, Pasadena",country:"🇺🇸",price:"From $198",idol:"bts",region:"americas",ticketUrl:"https://seatgeek.com"},
+  {id:2,artist:"BLACKPINK",tour:"BORN PINK Encore",date:"2026-09-05",venue:"Madison Square Garden, NYC",country:"🇺🇸",price:"From $124",idol:"bp",region:"americas",ticketUrl:"https://ticketmaster.com"},
+  {id:3,artist:"Stray Kids",tour:"DOMINATE World Tour",date:"2026-08-14",venue:"SoFi Stadium, LA",country:"🇺🇸",price:"From $89",idol:"skz",region:"americas",ticketUrl:"https://seatgeek.com"},
+  {id:4,artist:"aespa",tour:"SYNK: PARALLEL LINE",date:"2026-07-19",venue:"The Forum, Inglewood",country:"🇺🇸",price:"From $75",idol:"aespa",region:"americas",ticketUrl:"https://ticketmaster.com"},
+  {id:5,artist:"SEVENTEEN",tour:"RIGHT HERE World Tour",date:"2026-08-30",venue:"Allegiant Stadium, Las Vegas",country:"🇺🇸",price:"From $79",idol:"svt",region:"americas",ticketUrl:"https://seatgeek.com"},
+  {id:6,artist:"NewJeans",tour:"BUNNIES CAMP 2026",date:"2026-11-01",venue:"United Center, Chicago",country:"🇺🇸",price:"From $88",idol:"nj",region:"americas",ticketUrl:"https://interpark.com"},
+  // ids 7+: international legs of the same tours (Asia + Europe), local-feel pricing
+  {id:7,artist:"BTS",tour:"Grand Chapter World Tour",date:"2026-09-19",venue:"Seoul Olympic Stadium",country:"🇰🇷",price:"From ₩99,000",idol:"bts",region:"asia",ticketUrl:"https://interpark.com"},
+  {id:8,artist:"BTS",tour:"Grand Chapter World Tour",date:"2026-09-26",venue:"Tokyo Dome",country:"🇯🇵",price:"From ¥14,800",idol:"bts",region:"asia",ticketUrl:"https://interpark.com"},
+  {id:9,artist:"Stray Kids",tour:"DOMINATE World Tour",date:"2026-10-03",venue:"The O2, London",country:"🇬🇧",price:"From £75",idol:"skz",region:"europe",ticketUrl:"https://ticketmaster.com"},
+  {id:10,artist:"Stray Kids",tour:"DOMINATE World Tour",date:"2026-10-18",venue:"Singapore National Stadium",country:"🇸🇬",price:"From S$128",idol:"skz",region:"asia",ticketUrl:"https://interpark.com"},
+  {id:11,artist:"BLACKPINK",tour:"BORN PINK Encore",date:"2026-09-12",venue:"Tokyo Dome",country:"🇯🇵",price:"From ¥15,500",idol:"bp",region:"asia",ticketUrl:"https://interpark.com"},
+  {id:12,artist:"BLACKPINK",tour:"BORN PINK Encore",date:"2026-10-24",venue:"Philippine Arena, Manila",country:"🇵🇭",price:"From ₱4,500",idol:"bp",region:"asia",ticketUrl:"https://ticketmaster.com"},
+  {id:13,artist:"SEVENTEEN",tour:"RIGHT HERE World Tour",date:"2026-08-22",venue:"Gelora Bung Karno, Jakarta",country:"🇮🇩",price:"From Rp850K",idol:"svt",region:"asia",ticketUrl:"https://interpark.com"},
+  {id:14,artist:"SEVENTEEN",tour:"RIGHT HERE World Tour",date:"2026-11-14",venue:"Allianz Parque, São Paulo",country:"🇧🇷",price:"From R$320",idol:"svt",region:"americas",ticketUrl:"https://seatgeek.com"},
+  {id:15,artist:"aespa",tour:"SYNK: PARALLEL LINE",date:"2026-07-25",venue:"KSPO Dome, Seoul",country:"🇰🇷",price:"From ₩88,000",idol:"aespa",region:"asia",ticketUrl:"https://interpark.com"},
+  {id:16,artist:"TWICE",tour:"READY TO BE World Tour",date:"2026-10-10",venue:"The O2, London",country:"🇬🇧",price:"From £79",idol:"twice",region:"europe",ticketUrl:"https://ticketmaster.com"},
+  {id:17,artist:"NewJeans",tour:"BUNNIES CAMP 2026",date:"2026-11-08",venue:"Saitama Super Arena",country:"🇯🇵",price:"From ¥13,500",idol:"nj",region:"asia",ticketUrl:"https://interpark.com"},
 ];
 
 const DROPS = [
@@ -291,6 +304,19 @@ const loadSavedEvent = (): number | null => {
   try { return JSON.parse(localStorage.getItem("fandrop_savedEvent") || "null"); }
   catch { return null; }
 };
+type EvFilter = "mine" | "all";
+type EvRegion = "all" | "americas" | "europe" | "asia";
+const loadEvFilter = (): EvFilter => {
+  const v = localStorage.getItem("fandrop_evFilter");
+  if (v === "mine" || v === "all") return v;
+  // First visit: default to "My groups" only if the fan already follows someone.
+  return loadIdols().length > 0 ? "mine" : "all";
+};
+const loadEvRegion = (): EvRegion => {
+  const v = localStorage.getItem("fandrop_evRegion");
+  if (v === "all" || v === "americas" || v === "europe" || v === "asia") return v;
+  return "all";
+};
 
 // ─── MINI COMPONENTS ─────────────────────────────────────────────────────────
 const Lbl = ({children, style}: {children: React.ReactNode; style?: React.CSSProperties}) =>
@@ -322,6 +348,8 @@ export default function FanDrop() {
   const [pickerSearch, setPickerSearch] = useState("");
   const [customInput, setCustomInput] = useState("");
   const [savedEvent, setSavedEvent] = useState<number | null>(loadSavedEvent);
+  const [evFilter, setEvFilter] = useState<EvFilter>(loadEvFilter);
+  const [evRegion, setEvRegion] = useState<EvRegion>(loadEvRegion);
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>(loadChecked);
   const [openFanchant, setOpenFanchant] = useState<number | null>(null);
   const [glossSearch, setGlossSearch] = useState("");
@@ -710,6 +738,25 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
     // Affiliated ticket search links (Sovrn auto-affiliates these domains at click time).
     const vividUrl = event ? buildTicketSearchUrl("vivid seats", event.artist) : null;
     const stubhubUrl = event ? buildTicketSearchUrl("stubhub", event.artist) : null;
+
+    // ── FILTERS (group + region, both persisted) ──
+    const chooseFilter = (f: EvFilter) => { setEvFilter(f); localStorage.setItem("fandrop_evFilter", f); };
+    const chooseRegion = (r: EvRegion) => { setEvRegion(r); localStorage.setItem("fandrop_evRegion", r); };
+    const resetFilters = () => { chooseFilter("all"); chooseRegion("all"); };
+    const visibleEvents = EVENTS.filter(ev =>
+      (evFilter === "all" || myIdols.includes(ev.idol)) &&
+      (evRegion === "all" || ev.region === evRegion)
+    );
+    // Space Mono pill, matching the existing tag styling.
+    const chip = (active: boolean, label: string, onClick: () => void) => (
+      <button className="tap mono" onClick={onClick} style={{
+        padding:"7px 12px",borderRadius:20,
+        border:`1px solid ${active ? THEME.primary + "88" : "rgba(255,255,255,.1)"}`,
+        background: active ? THEME.primary + "22" : "rgba(255,255,255,.04)",
+        color: active ? "#C9A9FF" : "rgba(255,255,255,.5)",
+        fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",letterSpacing:".02em",
+      }}>{label}</button>
+    );
     return (
       <div style={{overflowY:"auto",paddingBottom:90}}>
         <div style={{padding:"52px 22px 16px"}}>
@@ -718,13 +765,43 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
           <div className="sans" style={{fontSize:12,color:"rgba(255,255,255,.38)",lineHeight:1.6}}>Pick your concert → get tickets, merch, outfit links + a personalised prep checklist.</div>
         </div>
 
+        {/* Filter chips — Row A: group · Row B: region */}
+        <div style={{padding:"0 20px 12px",display:"flex",flexDirection:"column",gap:8}}>
+          <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
+            {chip(evFilter === "mine", "⭐ My groups", () => chooseFilter("mine"))}
+            {chip(evFilter === "all", "All groups", () => chooseFilter("all"))}
+          </div>
+          <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
+            {chip(evRegion === "all", "🌍 All", () => chooseRegion("all"))}
+            {chip(evRegion === "americas", "🇺🇸 Americas", () => chooseRegion("americas"))}
+            {chip(evRegion === "europe", "🇪🇺 Europe", () => chooseRegion("europe"))}
+            {chip(evRegion === "asia", "🌏 Asia", () => chooseRegion("asia"))}
+          </div>
+        </div>
+
         <div style={{padding:"0 20px 18px",display:"flex",flexDirection:"column",gap:9}}>
-          {EVENTS.map(ev => {
+          {visibleEvents.length === 0 ? (
+            <div style={{borderRadius:18,background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.07)",padding:"26px 18px",textAlign:"center"}}>
+              <div style={{fontSize:14,fontWeight:700,marginBottom:6}}>No upcoming shows match — yet 🎤</div>
+              <div className="sans" style={{fontSize:11,color:"rgba(255,255,255,.4)",marginBottom:14,lineHeight:1.5}}>Try another region or your other groups.</div>
+              <button className="tap mono" onClick={resetFilters} style={{padding:"9px 16px",borderRadius:20,border:`1px solid ${THEME.primary}88`,background:THEME.primary+"22",color:"#C9A9FF",fontSize:11,fontWeight:700,cursor:"pointer"}}>Show all concerts</button>
+            </div>
+          ) : visibleEvents.map(ev => {
             const evIdol = getIdol(ev.idol);
             const dy = getDays(ev.date);
             const sel = savedEvent === ev.id;
             return (
-              <div key={ev.id} className="tap" onClick={() => { setSavedEvent(ev.id); localStorage.setItem("fandrop_savedEvent", JSON.stringify(ev.id)); pushToast(`${evIdol?.emoji ?? "🎵"} ${ev.artist} concert saved!`); }}
+              <div key={ev.id} className="tap" onClick={() => {
+                if (savedEvent === ev.id) {
+                  setSavedEvent(null);
+                  localStorage.removeItem("fandrop_savedEvent");
+                  pushToast("Concert removed");
+                } else {
+                  setSavedEvent(ev.id);
+                  localStorage.setItem("fandrop_savedEvent", JSON.stringify(ev.id));
+                  pushToast(`${evIdol?.emoji ?? "🎵"} ${ev.artist} concert saved!`);
+                }
+              }}
                 style={{borderRadius:18,background:sel ? `${evIdol?.color ?? "#7c3aed"}16` : "rgba(255,255,255,.04)",border:`1.5px solid ${sel ? (evIdol?.color ?? "#7c3aed")+"44" : "rgba(255,255,255,.07)"}`,padding:"13px 14px",display:"flex",gap:12,alignItems:"center",transition:"all .2s"}}>
                 <div style={{width:44,height:44,borderRadius:13,background:`${evIdol?.color ?? "#7c3aed"}18`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{evIdol?.emoji ?? "🎵"}</div>
                 <div style={{flex:1,minWidth:0}}>
