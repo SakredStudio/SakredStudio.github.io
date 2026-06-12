@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { KPOP_GROUPS, CUSTOM_PALETTE, slugify, type CatalogGroup, type GroupTier } from "./kpopGroups";
 
 /* ═══════════════════════════════════════════════════════
@@ -16,6 +16,17 @@ interface StyleItem {
   searchQuery?: string; // short generic merchant-search term; falls back to name if absent
 }
 interface StyleResult { look: string; vibe: string; items: StyleItem[]; }
+
+// One concert in the planner. Curated entries carry numeric ids; live SeatGeek
+// entries carry "sg-"+id string ids — hence id is string | number.
+interface PlannerEvent {
+  id: string | number;
+  artist: string; tour: string; date: string; venue: string;
+  country: string; price: string; idol: string; region: string; ticketUrl: string;
+}
+
+// Live concert feed (SeatGeek via the Cloudflare Worker). Same origin as the AI proxy.
+const EVENTS_URL = "https://fandrop-ai.mihir86-mp.workers.dev/events";
 
 // Maps a merchant name (case-insensitive) → that store's search-results URL for the
 // given item, so "Buy" links land users on the actual product instead of the bare
@@ -300,9 +311,25 @@ const loadWishlist = (): StyleItem[] => {
   try { return JSON.parse(localStorage.getItem("fandrop_wishlist") || "[]"); }
   catch { return []; }
 };
-const loadSavedEvent = (): number | null => {
+// Widened to string | number so it can hold both curated numeric ids and live
+// "sg-..." string ids. Old stored numeric ids parse back as numbers — no migration.
+const loadSavedEvent = (): string | number | null => {
   try { return JSON.parse(localStorage.getItem("fandrop_savedEvent") || "null"); }
   catch { return null; }
+};
+// Last-good live events for stale-while-revalidate (instant render, then refresh).
+const loadLiveEvents = (): PlannerEvent[] => {
+  try {
+    const raw = JSON.parse(localStorage.getItem("fandrop_liveEvents") || "null");
+    if (raw && Array.isArray(raw.events)) return raw.events as PlannerEvent[];
+  } catch { /* ignore */ }
+  return [];
+};
+// Accept only well-formed live events (defensive against a malformed worker response).
+const isValidLiveEvent = (e: unknown): e is PlannerEvent => {
+  const v = e as PlannerEvent;
+  return !!v && typeof v.id === "string" && typeof v.date === "string" &&
+         v.date.length >= 10 && typeof v.idol === "string";
 };
 type EvFilter = "mine" | "all";
 type EvRegion = "all" | "americas" | "europe" | "asia";
@@ -347,9 +374,41 @@ export default function FanDrop() {
   const [showPicker, setShowPicker] = useState(false);
   const [pickerSearch, setPickerSearch] = useState("");
   const [customInput, setCustomInput] = useState("");
-  const [savedEvent, setSavedEvent] = useState<number | null>(loadSavedEvent);
+  const [savedEvent, setSavedEvent] = useState<string | number | null>(loadSavedEvent);
   const [evFilter, setEvFilter] = useState<EvFilter>(loadEvFilter);
   const [evRegion, setEvRegion] = useState<EvRegion>(loadEvRegion);
+  const [liveEvents, setLiveEvents] = useState<PlannerEvent[]>(loadLiveEvents);
+
+  // Merge live + curated, deduped by (idol, date) with live winning; curated keeps
+  // covering Asia/other gaps. Past events dropped here so they vanish everywhere.
+  const mergedEvents = useMemo<PlannerEvent[]>(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const liveFut = liveEvents.filter(e => e && e.date >= today);
+    const liveKeys = new Set(liveFut.map(e => e.idol + "|" + e.date));
+    const curatedFut = EVENTS.filter(e => e.date >= today && !liveKeys.has(e.idol + "|" + e.date));
+    return [...liveFut, ...curatedFut].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  }, [liveEvents]);
+
+  // Stale-while-revalidate: cached live events already rendered above; refresh in the
+  // background with a 3s timeout. Any failure/empty leaves the curated list intact —
+  // the planner is never blank or blocked on the network (TWA offline case).
+  useEffect(() => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 3000);
+    (async () => {
+      try {
+        const r = await fetch(EVENTS_URL, { signal: ctrl.signal });
+        if (!r.ok) return;
+        const data = await r.json();
+        const evs: PlannerEvent[] = Array.isArray(data?.events) ? data.events.filter(isValidLiveEvent) : [];
+        if (evs.length === 0) return; // empty → keep curated / last-good cache
+        setLiveEvents(evs);
+        localStorage.setItem("fandrop_liveEvents", JSON.stringify({ events: evs, fetchedAt: data.fetchedAt || new Date().toISOString() }));
+      } catch { /* timeout / offline / parse error → keep curated, never block */ }
+      finally { clearTimeout(timer); }
+    })();
+    return () => { clearTimeout(timer); ctrl.abort(); };
+  }, []);
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>(loadChecked);
   const [openFanchant, setOpenFanchant] = useState<number | null>(null);
   const [glossSearch, setGlossSearch] = useState("");
@@ -625,7 +684,7 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
 
   // ── HOME ──────────────────────────────────────────────────────────────────────
   const renderHome = () => {
-    const event = savedEvent != null ? EVENTS.find(e => e.id === savedEvent) : null;
+    const event = savedEvent != null ? mergedEvents.find(e => e.id === savedEvent) : null;
     const days = event ? getDays(event.date) : null;
     const myDrops = DROPS.filter(d => !d.idol || myIdols.includes(d.idol));
     return (
@@ -732,7 +791,7 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
 
   // ── EVENTS / CONCERT KIT ──────────────────────────────────────────────────────
   const renderEvents = () => {
-    const event = savedEvent != null ? EVENTS.find(e => e.id === savedEvent) : null;
+    const event = savedEvent != null ? mergedEvents.find(e => e.id === savedEvent) : null;
     const days = event ? getDays(event.date) : null;
     const idol = event ? getIdol(event.idol) : null;
     // Affiliated ticket search links (Sovrn auto-affiliates these domains at click time).
@@ -743,7 +802,8 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
     const chooseFilter = (f: EvFilter) => { setEvFilter(f); localStorage.setItem("fandrop_evFilter", f); };
     const chooseRegion = (r: EvRegion) => { setEvRegion(r); localStorage.setItem("fandrop_evRegion", r); };
     const resetFilters = () => { chooseFilter("all"); chooseRegion("all"); };
-    const visibleEvents = EVENTS.filter(ev =>
+    // mergedEvents is live+curated, deduped, already future-only.
+    const visibleEvents = mergedEvents.filter(ev =>
       (evFilter === "all" || myIdols.includes(ev.idol)) &&
       (evRegion === "all" || ev.region === evRegion)
     );
