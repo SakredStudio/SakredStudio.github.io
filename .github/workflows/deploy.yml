@@ -29,6 +29,8 @@ jobs:
       - uses: actions/upload-pages-artifact@v5
         with:
           path: ./dist
+          # Keep .well-known/ (dot-dirs are excluded by default), needed for assetlinks.json
+          include-hidden-files: true
 
   deploy:
     needs: build
