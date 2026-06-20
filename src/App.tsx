@@ -160,11 +160,13 @@ const IDOLS: Idol[] = [
 // Real upcoming comebacks (ISO `date`). `idol` resolves to a FULL_CATALOG id where the
 // group clearly exists, else null. ytUrl is a live YouTube search built from artist+title.
 const DROPS = [
-  {artist:"(G)I-DLE",title:"We Made",type:"Mini Album",date:"2026-07-06",idol:"g-i-dle" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("(G)I-DLE We Made")}` as string|null},
-  {artist:"TXT (YEONJUN)",title:"NO LABELS: PART 02",type:"Mini Album",date:"2026-07-10",idol:"tomorrow-x-together" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("TXT (YEONJUN) NO LABELS: PART 02")}` as string|null},
+  {artist:"RYEOWOOK (Super Junior)",title:"Runaway",type:"Single",date:"2026-06-23",idol:"super-junior" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("RYEOWOOK Runaway")}` as string|null},
+  {artist:"ATEEZ",title:"GOLDEN HOUR : Part.5",type:"Album",date:"2026-06-26",idol:"ateez" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("ATEEZ GOLDEN HOUR : Part.5")}` as string|null},
+  {artist:"VERNON X THE8 (SEVENTEEN)",title:"V8",type:"Mini Album",date:"2026-06-29",idol:"svt" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("VERNON X THE8 V8")}` as string|null},
+  {artist:"ENHYPEN",title:"We'll Be Fine",type:"Single",date:"2026-06-29",idol:"enhypen" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("ENHYPEN We'll Be Fine")}` as string|null},
   {artist:"Dreamcatcher (UAU)",title:"Playlist #Your Youth",type:"Mini Album",date:"2026-07-01",idol:"dreamcatcher" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("Dreamcatcher (UAU) Playlist #Your Youth")}` as string|null},
-  {artist:"VAYONN",title:"Youth Today",type:"EP",date:"2026-07-06",idol:null as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("VAYONN Youth Today")}` as string|null},
-  {artist:"ASCENDER",title:"Debut Single",type:"Single",date:"2026-07-02",idol:null as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("ASCENDER Debut Single")}` as string|null},
+  {artist:"i-dle",title:"We Made",type:"Mini Album",date:"2026-07-06",idol:"g-i-dle" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("i-dle We Made")}` as string|null},
+  {artist:"YEONJUN (TXT)",title:"NO LABELS: PART 02",type:"Mini Album",date:"2026-07-10",idol:"tomorrow-x-together" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("YEONJUN NO LABELS: PART 02")}` as string|null},
 ];
 
 // Curated, browsable fanchant catalog. Stable `lib-${idol}-${slug(song)}` ids let these
