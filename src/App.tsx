@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { KPOP_GROUPS, CUSTOM_PALETTE, slugify, type CatalogGroup, type GroupTier } from "./kpopGroups";
 
 /* ═══════════════════════════════════════════════════════
@@ -17,16 +17,28 @@ interface StyleItem {
 }
 interface StyleResult { look: string; vibe: string; items: StyleItem[]; }
 
-// One concert in the planner. Curated entries carry numeric ids; live SeatGeek
-// entries carry "sg-"+id string ids — hence id is string | number.
-interface PlannerEvent {
-  id: string | number;
-  artist: string; tour: string; date: string; venue: string;
-  country: string; price: string; idol: string; region: string; ticketUrl: string;
+// A fanchant. Curated library entries carry structured `lines`; custom + AI-generated
+// chants carry freeform `text`. `id` is stable (deterministic for library items,
+// crypto.randomUUID() for user/AI ones) so the saved set survives add/remove/reorder.
+interface ChantLine { lyric: string; chant: string; note: string; }
+interface Chant {
+  id: string;
+  song: string;
+  artist: string;
+  idol: string | null;
+  guide?: string;
+  lines?: ChantLine[];
+  text?: string;
+  ytUrl?: string | null;
+  aiGenerated?: boolean;
 }
 
-// Live concert feed (SeatGeek via the Cloudflare Worker). Same origin as the AI proxy.
-const EVENTS_URL = "https://fandrop-ai.mihir86-mp.workers.dev/events";
+// A user-saved concert — fully self-contained, NOT a pointer into any list. The fan
+// picks one of their followed groups, a date, and optionally a city/venue; we store
+// exactly that, so the Home countdown renders from these fields alone (never stale).
+interface SavedConcert {
+  idol: string; date: string; city?: string; venue?: string;
+}
 
 // Maps a merchant name (case-insensitive) → that store's search-results URL for the
 // given item, so "Buy" links land users on the actual product instead of the bare
@@ -64,6 +76,12 @@ function buildTicketSearchUrl(provider: string, query: string): string | null {
   if (!tpl) return null;
   return tpl.replace("{q}", encodeURIComponent(query));
 }
+
+// Live, never-stale concert lookup: deep-link straight into Ticketmaster's search for a
+// followed group. Every current date (incl. ones a static list would miss) shows there,
+// and Sovrn/VigLink rewrites this outbound link at click time for affiliate credit.
+const concertSearchUrl = (group: string): string =>
+  `https://www.ticketmaster.com/search?q=${encodeURIComponent(group)}`;
 interface Idol {
   id: string; name: string; emoji: string; color: string;
   era: string; fandom: string; members: string[]; lightColor: string;
@@ -139,49 +157,29 @@ const IDOLS: Idol[] = [
   {id:"twice",name:"TWICE",emoji:"💋",color:"#f43f5e",era:"Ready to Be",fandom:"ONCE",members:["Nayeon","Jeongyeon","Momo","Sana","Jihyo","Mina","Dahyun","Chaeyoung","Tzuyu"],lightColor:"#f43f5e"},
 ];
 
-const EVENTS = [
-  // ids 1–6: original Americas legs (region added; ids/order untouched so saved-event localStorage stays valid)
-  {id:1,artist:"BTS",tour:"Grand Chapter World Tour",date:"2026-10-11",venue:"Rose Bowl, Pasadena",country:"🇺🇸",price:"From $198",idol:"bts",region:"americas",ticketUrl:"https://seatgeek.com"},
-  {id:2,artist:"BLACKPINK",tour:"BORN PINK Encore",date:"2026-09-05",venue:"Madison Square Garden, NYC",country:"🇺🇸",price:"From $124",idol:"bp",region:"americas",ticketUrl:"https://ticketmaster.com"},
-  {id:3,artist:"Stray Kids",tour:"DOMINATE World Tour",date:"2026-08-14",venue:"SoFi Stadium, LA",country:"🇺🇸",price:"From $89",idol:"skz",region:"americas",ticketUrl:"https://seatgeek.com"},
-  {id:4,artist:"aespa",tour:"SYNK: PARALLEL LINE",date:"2026-07-19",venue:"The Forum, Inglewood",country:"🇺🇸",price:"From $75",idol:"aespa",region:"americas",ticketUrl:"https://ticketmaster.com"},
-  {id:5,artist:"SEVENTEEN",tour:"RIGHT HERE World Tour",date:"2026-08-30",venue:"Allegiant Stadium, Las Vegas",country:"🇺🇸",price:"From $79",idol:"svt",region:"americas",ticketUrl:"https://seatgeek.com"},
-  {id:6,artist:"NewJeans",tour:"BUNNIES CAMP 2026",date:"2026-11-01",venue:"United Center, Chicago",country:"🇺🇸",price:"From $88",idol:"nj",region:"americas",ticketUrl:"https://interpark.com"},
-  // ids 7+: international legs of the same tours (Asia + Europe), local-feel pricing
-  {id:7,artist:"BTS",tour:"Grand Chapter World Tour",date:"2026-09-19",venue:"Seoul Olympic Stadium",country:"🇰🇷",price:"From ₩99,000",idol:"bts",region:"asia",ticketUrl:"https://interpark.com"},
-  {id:8,artist:"BTS",tour:"Grand Chapter World Tour",date:"2026-09-26",venue:"Tokyo Dome",country:"🇯🇵",price:"From ¥14,800",idol:"bts",region:"asia",ticketUrl:"https://interpark.com"},
-  {id:9,artist:"Stray Kids",tour:"DOMINATE World Tour",date:"2026-10-03",venue:"The O2, London",country:"🇬🇧",price:"From £75",idol:"skz",region:"europe",ticketUrl:"https://ticketmaster.com"},
-  {id:10,artist:"Stray Kids",tour:"DOMINATE World Tour",date:"2026-10-18",venue:"Singapore National Stadium",country:"🇸🇬",price:"From S$128",idol:"skz",region:"asia",ticketUrl:"https://interpark.com"},
-  {id:11,artist:"BLACKPINK",tour:"BORN PINK Encore",date:"2026-09-12",venue:"Tokyo Dome",country:"🇯🇵",price:"From ¥15,500",idol:"bp",region:"asia",ticketUrl:"https://interpark.com"},
-  {id:12,artist:"BLACKPINK",tour:"BORN PINK Encore",date:"2026-10-24",venue:"Philippine Arena, Manila",country:"🇵🇭",price:"From ₱4,500",idol:"bp",region:"asia",ticketUrl:"https://ticketmaster.com"},
-  {id:13,artist:"SEVENTEEN",tour:"RIGHT HERE World Tour",date:"2026-08-22",venue:"Gelora Bung Karno, Jakarta",country:"🇮🇩",price:"From Rp850K",idol:"svt",region:"asia",ticketUrl:"https://interpark.com"},
-  {id:14,artist:"SEVENTEEN",tour:"RIGHT HERE World Tour",date:"2026-11-14",venue:"Allianz Parque, São Paulo",country:"🇧🇷",price:"From R$320",idol:"svt",region:"americas",ticketUrl:"https://seatgeek.com"},
-  {id:15,artist:"aespa",tour:"SYNK: PARALLEL LINE",date:"2026-07-25",venue:"KSPO Dome, Seoul",country:"🇰🇷",price:"From ₩88,000",idol:"aespa",region:"asia",ticketUrl:"https://interpark.com"},
-  {id:16,artist:"TWICE",tour:"READY TO BE World Tour",date:"2026-10-10",venue:"The O2, London",country:"🇬🇧",price:"From £79",idol:"twice",region:"europe",ticketUrl:"https://ticketmaster.com"},
-  {id:17,artist:"NewJeans",tour:"BUNNIES CAMP 2026",date:"2026-11-08",venue:"Saitama Super Arena",country:"🇯🇵",price:"From ¥13,500",idol:"nj",region:"asia",ticketUrl:"https://interpark.com"},
-];
-
+// Real upcoming comebacks (ISO `date`). `idol` resolves to a FULL_CATALOG id where the
+// group clearly exists, else null. ytUrl is a live YouTube search built from artist+title.
 const DROPS = [
-  {artist:"BLACKPINK",title:"PINK VENOM REBIRTH",type:"Single",date:"2026-04-28",idol:"bp" as string|null,ytUrl:"https://youtube.com/results?search_query=BLACKPINK+PINK+VENOM+REBIRTH" as string|null},
-  {artist:"Stray Kids",title:"DOMINATE",type:"Album",date:"2026-05-03",idol:"skz" as string|null,ytUrl:"https://youtube.com/results?search_query=Stray+Kids+DOMINATE" as string|null},
-  {artist:"aespa",title:"Supernova II",type:"MV",date:"2026-05-05",idol:"aespa" as string|null,ytUrl:"https://youtube.com/results?search_query=aespa+Supernova+II+MV" as string|null},
-  {artist:"IVE",title:"WAVE",type:"Single",date:"2026-05-08",idol:"ive" as string|null,ytUrl:"https://youtube.com/results?search_query=IVE+WAVE+MV" as string|null},
-  {artist:"KISS OF LIFE",title:"MIDAS TOUCH",type:"Album",date:"2026-05-11",idol:null as string|null,ytUrl:"https://youtube.com/results?search_query=KISS+OF+LIFE+MIDAS+TOUCH" as string|null},
-  {artist:"NewJeans",title:"Supernatural Pt.2",type:"Single",date:"2026-05-18",idol:"nj" as string|null,ytUrl:null as string|null},
-  {artist:"TWS",title:"Golden Hour",type:"Mini Album",date:"2026-05-25",idol:null as string|null,ytUrl:null as string|null},
+  {artist:"(G)I-DLE",title:"We Made",type:"Mini Album",date:"2026-07-06",idol:"g-i-dle" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("(G)I-DLE We Made")}` as string|null},
+  {artist:"TXT (YEONJUN)",title:"NO LABELS: PART 02",type:"Mini Album",date:"2026-07-10",idol:"tomorrow-x-together" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("TXT (YEONJUN) NO LABELS: PART 02")}` as string|null},
+  {artist:"Dreamcatcher (UAU)",title:"Playlist #Your Youth",type:"Mini Album",date:"2026-07-01",idol:"dreamcatcher" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("Dreamcatcher (UAU) Playlist #Your Youth")}` as string|null},
+  {artist:"VAYONN",title:"Youth Today",type:"EP",date:"2026-07-06",idol:null as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("VAYONN Youth Today")}` as string|null},
+  {artist:"ASCENDER",title:"Debut Single",type:"Single",date:"2026-07-02",idol:null as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("ASCENDER Debut Single")}` as string|null},
 ];
 
-const FANCHANTS = [
-  {song:"Dynamite",artist:"BTS",idol:"bts",guide:"During the chorus, fans shout member names in order: Jin · Suga · J-Hope · RM · Jimin · V · Jungkook on the 'da-da-da-da' break.",
+// Curated, browsable fanchant catalog. Stable `lib-${idol}-${slug(song)}` ids let these
+// toggle in/out of the user's saved set (fandrop_chants) without collisions.
+const CHANT_LIBRARY: Chant[] = [
+  {id:`lib-bts-${slugify("Dynamite")}`,song:"Dynamite",artist:"BTS",idol:"bts",guide:"During the chorus, fans shout member names in order: Jin · Suga · J-Hope · RM · Jimin · V · Jungkook on the 'da-da-da-da' break.",
     lines:[{lyric:"'Cause I, I, I'm in the stars tonight",chant:"[clap clap]",note:"Double clap on downbeat"},{lyric:"So watch me bring the fire and set the night alight",chant:"JIN! SUGA! J-HOPE! RM!",note:"One name per beat"},{lyric:"Shining through the city",chant:"JIMIN! V! JUNGKOOK!",note:"End strong"}],
     ytUrl:"https://youtube.com/results?search_query=BTS+Dynamite+fanchant+guide"},
-  {song:"How You Like That",artist:"BLACKPINK",idol:"bp",guide:"Shout 'BLACKPINK!' before the first beat drops. During chorus, chant 'JISOO! JENNIE! ROSÉ! LISA!' in rapid succession.",
+  {id:`lib-bp-${slugify("How You Like That")}`,song:"How You Like That",artist:"BLACKPINK",idol:"bp",guide:"Shout 'BLACKPINK!' before the first beat drops. During chorus, chant 'JISOO! JENNIE! ROSÉ! LISA!' in rapid succession.",
     lines:[{lyric:"Look at you, now look at me",chant:"BLACKPINK!",note:"Shout before the drop"},{lyric:"How you like that? How you like that?",chant:"JISOO! JENNIE!",note:"Sharp, punchy"},{lyric:"How you like that?",chant:"ROSÉ! LISA!",note:"Finish the quad"}],
     ytUrl:"https://youtube.com/results?search_query=BLACKPINK+How+You+Like+That+fanchant"},
-  {song:"MIROH",artist:"Stray Kids",idol:"skz",guide:"Fast and intense. Shout all 8 members during the rap break. Crowd goes silent on the bridge for dramatic effect.",
+  {id:`lib-skz-${slugify("MIROH")}`,song:"MIROH",artist:"Stray Kids",idol:"skz",guide:"Fast and intense. Shout all 8 members during the rap break. Crowd goes silent on the bridge for dramatic effect.",
     lines:[{lyric:"We go! Miroh!",chant:"[stomp stomp clap]",note:"Match the stomp"},{lyric:"[rap break]",chant:"CHAN! LEE KNOW! CHANGBIN! HYUNJIN!",note:"Loud and fast"},{lyric:"[continues]",chant:"HAN! FELIX! SEUNGMIN! I.N!",note:"Equal energy"}],
     ytUrl:"https://youtube.com/results?search_query=Stray+Kids+MIROH+fanchant"},
-  {song:"FANCY",artist:"TWICE",idol:"twice",guide:"ONCE fans chant all 9 names. The chorus chant is iconic — practice it slowly first.",
+  {id:`lib-twice-${slugify("FANCY")}`,song:"FANCY",artist:"TWICE",idol:"twice",guide:"ONCE fans chant all 9 names. The chorus chant is iconic — practice it slowly first.",
     lines:[{lyric:"I just wanna make you fancy",chant:"NAYEON! JEONGYEON! MOMO!",note:"3 names, 3 beats"},{lyric:"Make you fancy me",chant:"SANA! JIHYO! MINA!",note:"Smooth and clear"},{lyric:"Fancy you, fancy you",chant:"DAHYUN! CHAEYOUNG! TZUYU!",note:"End triumphant"}],
     ytUrl:"https://youtube.com/results?search_query=TWICE+FANCY+fanchant"},
 ];
@@ -252,6 +250,31 @@ const BUDGET_TIPS = [
 const getDays = (d: string): number =>
   Math.ceil((new Date(d).getTime() - Date.now()) / 86400000);
 
+// Live release status, derived from the date every call — NO stored countdown strings.
+// future → "In N days" ("Tomorrow"/"Today 🎉" at 1/0); past ≤14d → "New"/"Released N
+// days ago"; past >14d → hidden:true so the feed auto-expires stale releases.
+interface DropStatus { label: string; upcoming: boolean; hidden: boolean; days: number; }
+const dropStatus = (date: string): DropStatus => {
+  const days = getDays(date);
+  if (days > 1)  return { label: `In ${days} days`, upcoming: true, hidden: false, days };
+  if (days === 1) return { label: "Tomorrow", upcoming: true, hidden: false, days };
+  if (days === 0) return { label: "Today 🎉", upcoming: true, hidden: false, days };
+  const ago = Math.abs(days);
+  if (ago <= 14) return { label: ago <= 2 ? "New" : `Released ${ago} days ago`, upcoming: false, hidden: false, days };
+  return { label: "", upcoming: false, hidden: true, days };
+};
+// Drop a generic-typed list to non-expired entries, sorted upcoming-soonest-first then
+// most-recent past. Generic so both DROPS and the Home subset reuse it.
+function liveDrops<T extends { date: string }>(list: T[]): { item: T; status: DropStatus }[] {
+  return list
+    .map(item => ({ item, status: dropStatus(item.date) }))
+    .filter(x => !x.status.hidden)
+    .sort((a, b) => {
+      if (a.status.upcoming !== b.status.upcoming) return a.status.upcoming ? -1 : 1;
+      return a.status.upcoming ? a.status.days - b.status.days : b.status.days - a.status.days;
+    });
+}
+
 /* ── GROUP RESOLVER ───────────────────────────────────────────────────────────
    One lookup across featured (IDOLS) → catalog (KPOP_GROUPS) → custom (user-added).
    Catalog/custom groups are normalised into the Idol shape (era/members/lightColor
@@ -311,38 +334,29 @@ const loadWishlist = (): StyleItem[] => {
   try { return JSON.parse(localStorage.getItem("fandrop_wishlist") || "[]"); }
   catch { return []; }
 };
-// Widened to string | number so it can hold both curated numeric ids and live
-// "sg-..." string ids. Old stored numeric ids parse back as numbers — no migration.
-const loadSavedEvent = (): string | number | null => {
-  try { return JSON.parse(localStorage.getItem("fandrop_savedEvent") || "null"); }
-  catch { return null; }
-};
-// Last-good live events for stale-while-revalidate (instant render, then refresh).
-const loadLiveEvents = (): PlannerEvent[] => {
+// The user's saved chant set (NEW key, mirrors loadIdols). First run (key absent) →
+// pre-seed with the 4 curated library chants so "My Chants" isn't empty out of the box.
+const loadChants = (): Chant[] => {
   try {
-    const raw = JSON.parse(localStorage.getItem("fandrop_liveEvents") || "null");
-    if (raw && Array.isArray(raw.events)) return raw.events as PlannerEvent[];
-  } catch { /* ignore */ }
-  return [];
+    const raw = localStorage.getItem("fandrop_chants");
+    if (raw == null) return CHANT_LIBRARY.slice();
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as Chant[]) : CHANT_LIBRARY.slice();
+  } catch { return CHANT_LIBRARY.slice(); }
 };
-// Accept only well-formed live events (defensive against a malformed worker response).
-const isValidLiveEvent = (e: unknown): e is PlannerEvent => {
-  const v = e as PlannerEvent;
-  return !!v && typeof v.id === "string" && typeof v.date === "string" &&
-         v.date.length >= 10 && typeof v.idol === "string";
-};
-type EvFilter = "mine" | "all";
-type EvRegion = "all" | "americas" | "europe" | "asia";
-const loadEvFilter = (): EvFilter => {
-  const v = localStorage.getItem("fandrop_evFilter");
-  if (v === "mine" || v === "all") return v;
-  // First visit: default to "My groups" only if the fan already follows someone.
-  return loadIdols().length > 0 ? "mine" : "all";
-};
-const loadEvRegion = (): EvRegion => {
-  const v = localStorage.getItem("fandrop_evRegion");
-  if (v === "all" || v === "americas" || v === "europe" || v === "asia") return v;
-  return "all";
+// A saved concert is now a self-contained {idol,date,city?,venue?} object — never a
+// pointer into a list. Old installs stored a bare id (number/string); that shape can no
+// longer resolve, so we clear it and treat it as "no saved concert" instead of crashing.
+const loadSavedEvent = (): SavedConcert | null => {
+  try {
+    const raw: unknown = JSON.parse(localStorage.getItem("fandrop_savedEvent") || "null");
+    const v = raw as SavedConcert;
+    if (v && typeof v === "object" && typeof v.idol === "string" && typeof v.date === "string") {
+      return v;
+    }
+    if (raw != null) localStorage.removeItem("fandrop_savedEvent"); // legacy id-pointer → drop
+    return null;
+  } catch { return null; }
 };
 
 // ─── MINI COMPONENTS ─────────────────────────────────────────────────────────
@@ -374,43 +388,26 @@ export default function FanDrop() {
   const [showPicker, setShowPicker] = useState(false);
   const [pickerSearch, setPickerSearch] = useState("");
   const [customInput, setCustomInput] = useState("");
-  const [savedEvent, setSavedEvent] = useState<string | number | null>(loadSavedEvent);
-  const [evFilter, setEvFilter] = useState<EvFilter>(loadEvFilter);
-  const [evRegion, setEvRegion] = useState<EvRegion>(loadEvRegion);
-  const [liveEvents, setLiveEvents] = useState<PlannerEvent[]>(loadLiveEvents);
-
-  // Merge live + curated, deduped by (idol, date) with live winning; curated keeps
-  // covering Asia/other gaps. Past events dropped here so they vanish everywhere.
-  const mergedEvents = useMemo<PlannerEvent[]>(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    const liveFut = liveEvents.filter(e => e && e.date >= today);
-    const liveKeys = new Set(liveFut.map(e => e.idol + "|" + e.date));
-    const curatedFut = EVENTS.filter(e => e.date >= today && !liveKeys.has(e.idol + "|" + e.date));
-    return [...liveFut, ...curatedFut].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-  }, [liveEvents]);
-
-  // Stale-while-revalidate: cached live events already rendered above; refresh in the
-  // background with a 3s timeout. Any failure/empty leaves the curated list intact —
-  // the planner is never blank or blocked on the network (TWA offline case).
-  useEffect(() => {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 3000);
-    (async () => {
-      try {
-        const r = await fetch(EVENTS_URL, { signal: ctrl.signal });
-        if (!r.ok) return;
-        const data = await r.json();
-        const evs: PlannerEvent[] = Array.isArray(data?.events) ? data.events.filter(isValidLiveEvent) : [];
-        if (evs.length === 0) return; // empty → keep curated / last-good cache
-        setLiveEvents(evs);
-        localStorage.setItem("fandrop_liveEvents", JSON.stringify({ events: evs, fetchedAt: data.fetchedAt || new Date().toISOString() }));
-      } catch { /* timeout / offline / parse error → keep curated, never block */ }
-      finally { clearTimeout(timer); }
-    })();
-    return () => { clearTimeout(timer); ctrl.abort(); };
-  }, []);
+  const [savedEvent, setSavedEvent] = useState<SavedConcert | null>(loadSavedEvent);
+  // "Save my concert" form state (group + date + optional city/venue).
+  const [saveIdol, setSaveIdol] = useState<string>("");
+  const [saveDate, setSaveDate] = useState<string>("");
+  const [saveCity, setSaveCity] = useState<string>("");
+  const [saveVenue, setSaveVenue] = useState<string>("");
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>(loadChecked);
-  const [openFanchant, setOpenFanchant] = useState<number | null>(null);
+  // Fanchants: saved set (persisted) + UI state. Open/expand keyed by chant id (string)
+  // so it survives a dynamic, reorderable set.
+  const [myChants, setMyChants] = useState<Chant[]>(loadChants);
+  const [openChant, setOpenChant] = useState<string | null>(null);
+  const [showAllChants, setShowAllChants] = useState(false);
+  const [chantLibGroup, setChantLibGroup] = useState<string>("all");
+  const [chantFormGroup, setChantFormGroup] = useState<string>("");
+  const [chantFormSong, setChantFormSong] = useState("");
+  const [chantFormText, setChantFormText] = useState("");
+  const [chantFormYt, setChantFormYt] = useState("");
+  const [chantGenGroup, setChantGenGroup] = useState<string>("");
+  const [chantGenSong, setChantGenSong] = useState("");
+  const [chantMode, setChantMode] = useState<AiMode>("idle");
   const [glossSearch, setGlossSearch] = useState("");
   const [fanSection, setFanSection] = useState<FanSection>("fanchant");
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -455,6 +452,39 @@ export default function FanDrop() {
     });
   };
 
+  // ── CHANTS: write-through persistence to fandrop_chants (mirrors toggleIdol) ──
+  const persistChants = (next: Chant[]) => {
+    localStorage.setItem("fandrop_chants", JSON.stringify(next));
+    return next;
+  };
+  const isChantSaved = (id: string) => myChants.some(c => c.id === id);
+  const addChant = (chant: Chant) => setMyChants(s => persistChants(s.some(c => c.id === chant.id) ? s : [...s, chant]));
+  const removeChant = (id: string) => {
+    setMyChants(s => persistChants(s.filter(c => c.id !== id)));
+    setOpenChant(o => (o === id ? null : o));
+  };
+  const toggleLibraryChant = (chant: Chant) => {
+    if (isChantSaved(chant.id)) { removeChant(chant.id); pushToast("Removed from My Chants"); }
+    else { addChant(chant); pushToast("✓ Added to My Chants"); }
+  };
+  const addCustomChant = () => {
+    const song = chantFormSong.trim();
+    const text = chantFormText.trim();
+    if (!song || !text) { pushToast("Add a song title and chant text"); return; }
+    const g = chantFormGroup ? getIdol(chantFormGroup) : undefined;
+    const yt = chantFormYt.trim();
+    addChant({
+      id: crypto.randomUUID(),
+      song,
+      artist: g?.name ?? "Custom",
+      idol: chantFormGroup || null,
+      text,
+      ytUrl: /^https?:\/\//i.test(yt) ? yt : null,
+    });
+    setChantFormSong(""); setChantFormText(""); setChantFormYt("");
+    pushToast("🎤 Custom chant saved!");
+  };
+
   // Add a free-text group. If the name matches a featured/catalog/custom entry
   // (case-insensitive) we toggle THAT entry on instead of creating a duplicate.
   const addCustomGroup = () => {
@@ -489,6 +519,27 @@ export default function FanDrop() {
   };
 
   const myIdolData = myIdols.map(id => getIdol(id)).filter((x): x is Idol => !!x);
+
+  // Save a self-contained concert ({idol,date,city?,venue?}) so the Home countdown can
+  // render from these fields alone — no dependency on any event list.
+  const saveConcert = () => {
+    const idolId = saveIdol || myIdols[0];
+    if (!idolId || !saveDate) { pushToast("Pick a group and a date"); return; }
+    const sc: SavedConcert = {
+      idol: idolId, date: saveDate,
+      city: saveCity.trim() || undefined,
+      venue: saveVenue.trim() || undefined,
+    };
+    setSavedEvent(sc);
+    localStorage.setItem("fandrop_savedEvent", JSON.stringify(sc));
+    pushToast(`${getIdol(idolId)?.emoji ?? "🎵"} Concert saved!`);
+  };
+  const clearSavedConcert = () => {
+    setSavedEvent(null);
+    localStorage.removeItem("fandrop_savedEvent");
+    pushToast("Concert removed");
+  };
+
   // Dynamic group theming: anchor = followed group's official color, else default violet.
   const anchor = myIdolData[0]?.color ?? THEME.primary;
   // Holographic hero gradient — first stop takes on the active group's color.
@@ -620,6 +671,48 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
     }
   };
 
+  // Generate a fanchant guide via FANI (same Worker, same model + token budget as the
+  // other AI calls — the Worker's 1024 cap stands). Saved as an aiGenerated draft.
+  const generateChant = async (groupId: string, song?: string) => {
+    if (chantMode === "loading") return;
+    const g = getIdol(groupId);
+    if (!g) { pushToast("Pick a group first"); return; }
+    setChantMode("loading");
+    const songName = (song ?? "").trim();
+    try {
+      const res = await fetch("https://fandrop-ai.mihir86-mp.workers.dev", {
+        method: "POST",
+        headers: ANTHROPIC_HEADERS,
+        body: JSON.stringify({
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 1000,
+          system: `You are a K-pop fanchant expert. Write a concise, practical fan-chant guide a fan can learn before a concert. Give the actual chant lines (member-name chants, "[clap]"/"[stomp]" cues, key call-and-response phrases) and say WHERE each goes in the song (intro, chorus, rap break, bridge). Keep it under ~150 words, plain text, no markdown headers. If you are unsure of exact official chants, say so briefly.`,
+          messages: [{role: "user", content: songName
+            ? `Write a fanchant guide for ${g.name} — the song "${songName}".`
+            : `Write a general fanchant guide for ${g.name} (member-name chant order + their most chant-heavy title track).`}],
+        }),
+      });
+      const data = await res.json();
+      const text: string = data.content?.find((b: {type: string}) => b.type === "text")?.text ?? "";
+      if (!text.trim()) throw new Error("empty");
+      addChant({
+        id: crypto.randomUUID(),
+        song: songName || `${g.name} fanchant`,
+        artist: g.name,
+        idol: groupId,
+        text: text.trim(),
+        ytUrl: `https://www.youtube.com/results?search_query=${encodeURIComponent(`${g.name} ${songName} fanchant`.trim())}`,
+        aiGenerated: true,
+      });
+      setChantGenSong("");
+      setChantMode("idle");
+      pushToast("✨ AI chant added — verify before the show");
+    } catch {
+      pushToast("Couldn't generate — try again!");
+      setChantMode("idle");
+    }
+  };
+
   const STYLE_PRESETS = [
     {label:"Airport OOTD",icon:"✈️",prompt:"K-pop idol airport fashion, oversized blazer, casual luxury streetwear"},
     {label:"Concert Fan",icon:"🎟",prompt:"K-pop concert fan outfit, lightstick-friendly, comfortable yet stylish"},
@@ -653,8 +746,11 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
       <div style={{width:"100%",maxWidth:430,display:"flex",flexDirection:"column",minHeight:"100vh"}}>
         <div style={{flex:1,display:"flex",flexDirection:"column",justifyContent:"center",padding:"40px 24px 32px"}}>
           <div style={{textAlign:"center",marginBottom:36}}>
-            <div style={{fontSize:52,marginBottom:14}}>🎶</div>
-            <div className="h1 gradient-text" style={{fontSize:42,marginBottom:8,background:heroGradient}}>{APP_NAME}</div>
+            <img src="./icon-512.png" alt={APP_NAME} width={56} height={56} style={{width:56,height:56,marginBottom:14,borderRadius:14,objectFit:"contain",imageRendering:"auto"}}/>
+            {/* Gradient + clip on the SAME text node via backgroundImage (longhand) so the
+                shorthand never resets background-clip; solid fallback color guarantees it
+                can never render invisible. */}
+            <div className="h1" style={{fontSize:42,marginBottom:8,display:"inline-block",backgroundImage:heroGradient,WebkitBackgroundClip:"text",backgroundClip:"text",WebkitTextFillColor:"transparent",color:"#c084fc"}}>{APP_NAME}</div>
             <div className="sans" style={{fontSize:14,color:"rgba(255,255,255,.4)",lineHeight:1.7}}>The fan app built for real K-pop fans.<br/>Pick your groups to get started.</div>
           </div>
           <Lbl>Who do you stan? (pick all that apply)</Lbl>
@@ -684,9 +780,13 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
 
   // ── HOME ──────────────────────────────────────────────────────────────────────
   const renderHome = () => {
-    const event = savedEvent != null ? mergedEvents.find(e => e.id === savedEvent) : null;
+    const event = savedEvent;
+    const eventIdol = event ? getIdol(event.idol) : null;
+    const eventColor = eventIdol?.color ?? "#7c3aed";
     const days = event ? getDays(event.date) : null;
-    const myDrops = DROPS.filter(d => !d.idol || myIdols.includes(d.idol));
+    const eventWhere = event ? [event.venue, event.city].filter(Boolean).join(" · ") : "";
+    // Same live filter/sort/expiry as the Drops tab, scoped to the user's groups.
+    const myDrops = liveDrops(DROPS.filter(d => !d.idol || myIdols.includes(d.idol)));
     return (
       <div style={{overflowY:"auto",paddingBottom:90}}>
         <div style={{padding:"52px 22px 20px",position:"relative"}}>
@@ -707,16 +807,16 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
         </div>
 
         {event ? (
-          <div className="tap shimmer fade" onClick={() => setTab("events")} style={{margin:"0 20px 18px",borderRadius:22,background:`linear-gradient(135deg,${getIdol(event.idol)?.color ?? "#7c3aed"}1a,rgba(255,255,255,.03))`,border:`1px solid ${getIdol(event.idol)?.color ?? "#7c3aed"}30`,padding:"18px 20px",overflow:"hidden",position:"relative"}}>
-            <div style={{position:"absolute",top:-30,right:-30,width:120,height:120,borderRadius:"50%",background:`${getIdol(event.idol)?.color ?? "#7c3aed"}0d`}}/>
-            <Lbl style={{color:getIdol(event.idol)?.color ?? "#7c3aed"}}>🎟 My Concert · Tap for Full Kit</Lbl>
+          <div className="tap shimmer fade" onClick={() => setTab("events")} style={{margin:"0 20px 18px",borderRadius:22,background:`linear-gradient(135deg,${eventColor}1a,rgba(255,255,255,.03))`,border:`1px solid ${eventColor}30`,padding:"18px 20px",overflow:"hidden",position:"relative"}}>
+            <div style={{position:"absolute",top:-30,right:-30,width:120,height:120,borderRadius:"50%",background:`${eventColor}0d`}}/>
+            <Lbl style={{color:eventColor}}>🎟 My Concert · Tap for Full Kit</Lbl>
             <div style={{display:"flex",alignItems:"flex-end",gap:10,marginBottom:8}}>
-              <div className="h1" style={{fontSize:64,color:getIdol(event.idol)?.color ?? "#7c3aed",lineHeight:1}}>{days ?? "—"}</div>
+              <div className="h1" style={{fontSize:64,color:eventColor,lineHeight:1}}>{days != null ? Math.max(days, 0) : "—"}</div>
               <div className="sans" style={{fontSize:14,color:"rgba(255,255,255,.4)",marginBottom:10}}>days to go</div>
             </div>
-            <div style={{fontSize:15,fontWeight:700,marginBottom:3}}>{event.artist} {getIdol(event.idol)?.emoji ?? "🎵"}</div>
-            <div className="sans" style={{fontSize:11,color:"rgba(255,255,255,.38)"}}>{event.venue} · {event.country}</div>
-            {days != null && days <= 14 && <div style={{marginTop:10,display:"inline-flex",gap:6,alignItems:"center",padding:"6px 13px",borderRadius:20,background:"rgba(239,68,68,.12)",border:"1px solid rgba(239,68,68,.22)",color:"#ef4444",fontSize:11,fontFamily:"'Space Mono'",fontWeight:700}}><div className="live-dot"/> {days}d — Concert Kit urgent!</div>}
+            <div style={{fontSize:15,fontWeight:700,marginBottom:3}}>{eventIdol?.name ?? "My Concert"} {eventIdol?.emoji ?? "🎵"}</div>
+            <div className="sans" style={{fontSize:11,color:"rgba(255,255,255,.38)"}}>{eventWhere || new Date(event.date).toDateString()}</div>
+            {days != null && days >= 0 && days <= 14 && <div style={{marginTop:10,display:"inline-flex",gap:6,alignItems:"center",padding:"6px 13px",borderRadius:20,background:"rgba(239,68,68,.12)",border:"1px solid rgba(239,68,68,.22)",color:"#ef4444",fontSize:11,fontFamily:"'Space Mono'",fontWeight:700}}><div className="live-dot"/> {days}d — Concert Kit urgent!</div>}
           </div>
         ) : (
           <div className="tap fade card" onClick={() => setTab("events")} style={{margin:"0 20px 18px",padding:"16px 18px",display:"flex",gap:14,alignItems:"center",border:"1.5px dashed rgba(192,132,252,.2)"}}>
@@ -729,16 +829,14 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
         <div style={{padding:"0 22px 10px"}}><Lbl>🎵 My Group Drops</Lbl></div>
         {myDrops.length > 0 ? (
           <div className="hrow" style={{padding:"0 20px 18px"}}>
-            {myDrops.slice(0, 6).map((d, i) => {
+            {myDrops.slice(0, 6).map(({item: d, status}, i) => {
               const idol = d.idol ? getIdol(d.idol) : null;
-              const daysLeft = getDays(d.date);
-              const daysAgo = daysLeft <= 0 ? Math.abs(daysLeft) : 0;
               return (
                 <div key={i} className="tap" onClick={() => d.ytUrl && window.open(d.ytUrl, "_blank")} style={{flexShrink:0,width:140,borderRadius:16,background:idol ? `${idol.color}14` : "rgba(255,255,255,.05)",border:`1px solid ${idol ? idol.color+"28" : "rgba(255,255,255,.07)"}`,padding:"12px 12px 10px"}}>
                   <div style={{fontSize:9,color:idol ? idol.color : "rgba(255,255,255,.35)",fontFamily:"'Space Mono'",letterSpacing:".07em",marginBottom:3}}>{d.type.toUpperCase()}</div>
                   <div style={{fontSize:12,fontWeight:700,lineHeight:1.2,marginBottom:3}}>{d.title}</div>
                   <div className="sans" style={{fontSize:10,color:"rgba(255,255,255,.38)",marginBottom:7}}>{d.artist}</div>
-                  <div style={{fontSize:10,color:daysAgo === 0 && daysLeft <= 0 ? "#ef4444" : daysLeft > 0 ? "rgba(255,255,255,.3)" : idol ? idol.color : "#22c55e",fontFamily:"'Space Mono'"}}>{daysLeft > 0 ? `In ${daysLeft}d` : daysAgo === 0 ? "🔴 TODAY" : `${daysAgo}d ago`}</div>
+                  <div style={{fontSize:10,color:status.days === 0 ? "#ef4444" : status.upcoming ? "rgba(255,255,255,.3)" : idol ? idol.color : "#22c55e",fontFamily:"'Space Mono'"}}>{status.days === 0 ? "🔴 TODAY" : status.label}</div>
                 </div>
               );
             })}
@@ -791,120 +889,93 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
 
   // ── EVENTS / CONCERT KIT ──────────────────────────────────────────────────────
   const renderEvents = () => {
-    const event = savedEvent != null ? mergedEvents.find(e => e.id === savedEvent) : null;
+    const event = savedEvent;
     const days = event ? getDays(event.date) : null;
     const idol = event ? getIdol(event.idol) : null;
-    // Affiliated ticket search links (Sovrn auto-affiliates these domains at click time).
-    const vividUrl = event ? buildTicketSearchUrl("vivid seats", event.artist) : null;
-    const stubhubUrl = event ? buildTicketSearchUrl("stubhub", event.artist) : null;
-
-    // ── FILTERS (group + region, both persisted) ──
-    const chooseFilter = (f: EvFilter) => { setEvFilter(f); localStorage.setItem("fandrop_evFilter", f); };
-    const chooseRegion = (r: EvRegion) => { setEvRegion(r); localStorage.setItem("fandrop_evRegion", r); };
-    const resetFilters = () => { chooseFilter("all"); chooseRegion("all"); };
-    // mergedEvents is live+curated, deduped, already future-only.
-    const visibleEvents = mergedEvents.filter(ev =>
-      (evFilter === "all" || myIdols.includes(ev.idol)) &&
-      (evRegion === "all" || ev.region === evRegion)
-    );
-    // Space Mono pill, matching the existing tag styling.
-    const chip = (active: boolean, label: string, onClick: () => void) => (
-      <button className="tap mono" onClick={onClick} style={{
-        padding:"7px 12px",borderRadius:20,
-        border:`1px solid ${active ? THEME.primary + "88" : "rgba(255,255,255,.1)"}`,
-        background: active ? THEME.primary + "22" : "rgba(255,255,255,.04)",
-        color: active ? "#C9A9FF" : "rgba(255,255,255,.5)",
-        fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",letterSpacing:".02em",
-      }}>{label}</button>
-    );
+    const eventWhere = event ? [event.venue, event.city].filter(Boolean).join(" · ") : "";
+    // Dark form-control styling, shared by the "Save my concert" inputs.
+    const inputStyle: React.CSSProperties = {
+      width:"100%",padding:"10px 12px",borderRadius:12,
+      border:"1px solid rgba(255,255,255,.1)",background:"rgba(255,255,255,.04)",
+      color:"#fff",fontSize:12,outline:"none",fontFamily:"'DM Sans',sans-serif",
+    };
     return (
       <div style={{overflowY:"auto",paddingBottom:90}}>
         <div style={{padding:"52px 22px 16px"}}>
-          <Lbl>Upcoming Shows + Full Kit</Lbl>
+          <Lbl>Live Tickets + Full Kit</Lbl>
           <div className="h1" style={{fontSize:28,marginBottom:4}}>Concert<br/>Planner</div>
-          <div className="sans" style={{fontSize:12,color:"rgba(255,255,255,.38)",lineHeight:1.6}}>Pick your concert → get tickets, merch, outfit links + a personalised prep checklist.</div>
+          <div className="sans" style={{fontSize:12,color:"rgba(255,255,255,.38)",lineHeight:1.6}}>Tap a group for live Ticketmaster dates, save your show, then work the prep checklist.</div>
         </div>
 
-        {/* Filter chips — Row A: group · Row B: region */}
-        <div style={{padding:"0 20px 12px",display:"flex",flexDirection:"column",gap:8}}>
-          <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
-            {chip(evFilter === "mine", "⭐ My groups", () => chooseFilter("mine"))}
-            {chip(evFilter === "all", "All groups", () => chooseFilter("all"))}
-          </div>
-          <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
-            {chip(evRegion === "all", "🌍 All", () => chooseRegion("all"))}
-            {chip(evRegion === "americas", "🇺🇸 Americas", () => chooseRegion("americas"))}
-            {chip(evRegion === "europe", "🇪🇺 Europe", () => chooseRegion("europe"))}
-            {chip(evRegion === "asia", "🌏 Asia", () => chooseRegion("asia"))}
-          </div>
+        {/* ── LIVE GROUP GRID → Ticketmaster (never stored, never stale) ── */}
+        <div style={{padding:"0 20px 8px",display:"flex",alignItems:"center",gap:8}}>
+          <div style={{fontSize:12,fontWeight:700}}>🎤 Your Groups · Live Dates</div><AffTag/>
         </div>
-
-        <div style={{padding:"0 20px 18px",display:"flex",flexDirection:"column",gap:9}}>
-          {visibleEvents.length === 0 ? (
-            <div style={{borderRadius:18,background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.07)",padding:"26px 18px",textAlign:"center"}}>
-              <div style={{fontSize:14,fontWeight:700,marginBottom:6}}>No upcoming shows match — yet 🎤</div>
-              <div className="sans" style={{fontSize:11,color:"rgba(255,255,255,.4)",marginBottom:14,lineHeight:1.5}}>Try another region or your other groups.</div>
-              <button className="tap mono" onClick={resetFilters} style={{padding:"9px 16px",borderRadius:20,border:`1px solid ${THEME.primary}88`,background:THEME.primary+"22",color:"#C9A9FF",fontSize:11,fontWeight:700,cursor:"pointer"}}>Show all concerts</button>
-            </div>
-          ) : visibleEvents.map(ev => {
-            const evIdol = getIdol(ev.idol);
-            const dy = getDays(ev.date);
-            const sel = savedEvent === ev.id;
-            return (
-              <div key={ev.id} className="tap" onClick={() => {
-                if (savedEvent === ev.id) {
-                  setSavedEvent(null);
-                  localStorage.removeItem("fandrop_savedEvent");
-                  pushToast("Concert removed");
-                } else {
-                  setSavedEvent(ev.id);
-                  localStorage.setItem("fandrop_savedEvent", JSON.stringify(ev.id));
-                  pushToast(`${evIdol?.emoji ?? "🎵"} ${ev.artist} concert saved!`);
-                }
-              }}
-                style={{borderRadius:18,background:sel ? `${evIdol?.color ?? "#7c3aed"}16` : "rgba(255,255,255,.04)",border:`1.5px solid ${sel ? (evIdol?.color ?? "#7c3aed")+"44" : "rgba(255,255,255,.07)"}`,padding:"13px 14px",display:"flex",gap:12,alignItems:"center",transition:"all .2s"}}>
-                <div style={{width:44,height:44,borderRadius:13,background:`${evIdol?.color ?? "#7c3aed"}18`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{evIdol?.emoji ?? "🎵"}</div>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:13,fontWeight:700,marginBottom:1}}>{ev.artist} {ev.country}</div>
-                  <div className="sans" style={{fontSize:10,color:"rgba(255,255,255,.38)",marginBottom:5,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{ev.venue}</div>
-                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                    <span style={{fontSize:9,padding:"2px 8px",borderRadius:18,background:`${evIdol?.color ?? "#7c3aed"}14`,color:evIdol?.color ?? "#7c3aed",fontFamily:"'Space Mono'",fontWeight:700}}>{dy}d away</span>
-                    <span style={{fontSize:9,padding:"2px 8px",borderRadius:18,background:"rgba(34,211,153,.1)",color:"#34d399",fontFamily:"'Space Mono'"}}>{ev.price}</span>
+        {myIdolData.length === 0 ? (
+          <div style={{margin:"0 20px 18px",borderRadius:18,background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.07)",padding:"26px 18px",textAlign:"center"}}>
+            <div style={{fontSize:14,fontWeight:700,marginBottom:6}}>Follow a group to see live shows 🎤</div>
+            <div className="sans" style={{fontSize:11,color:"rgba(255,255,255,.4)",marginBottom:14,lineHeight:1.5}}>Pick your groups and we'll deep-link straight into their current Ticketmaster dates.</div>
+            <button className="tap mono" onClick={() => setShowPicker(true)} style={{padding:"9px 16px",borderRadius:20,border:`1px solid ${THEME.primary}88`,background:THEME.primary+"22",color:"#C9A9FF",fontSize:11,fontWeight:700,cursor:"pointer"}}>+ Follow groups</button>
+          </div>
+        ) : (
+          <div style={{padding:"0 20px 16px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            {myIdolData.map(g => {
+              const tmUrl = concertSearchUrl(g.name);
+              const resaleUrl = buildTicketSearchUrl("stubhub", g.name);
+              return (
+                <div key={g.id} style={{borderRadius:18,background:`${g.color}14`,border:`1px solid ${g.color}28`,padding:"14px 13px",display:"flex",flexDirection:"column",gap:10}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
+                    <div style={{width:38,height:38,borderRadius:12,background:`${g.color}22`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>{g.emoji}</div>
+                    <div style={{minWidth:0}}>
+                      <div style={{fontSize:13,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{g.name}</div>
+                      <div className="sans" style={{fontSize:9,color:"rgba(255,255,255,.35)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{g.fandom}</div>
+                    </div>
                   </div>
+                  <a href={tmUrl} target="_blank" rel="noopener noreferrer">
+                    <button className="tap" style={{width:"100%",padding:"9px",borderRadius:12,border:"none",background:buyGradient,color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"'Space Mono'",boxShadow:`0 5px 16px ${THEME.accent}44`}}>Find tickets ↗</button>
+                  </a>
+                  {typeof resaleUrl === "string" && /^https?:\/\//i.test(resaleUrl) && (
+                    <a href={resaleUrl} target="_blank" rel="noopener noreferrer" style={{textAlign:"center"}}>
+                      <span className="mono" style={{fontSize:10,color:g.color}}>Check resale ↗</span>
+                    </a>
+                  )}
                 </div>
-                {sel && <div style={{fontSize:16,color:evIdol?.color ?? "#7c3aed",flexShrink:0}}>✓</div>}
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── SAVE MY CONCERT → self-contained {idol,date,city?,venue?} ── */}
+        <div style={{padding:"0 20px 18px"}}>
+          <div style={{borderRadius:18,background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.07)",padding:"14px 15px"}}>
+            <div style={{fontSize:12,fontWeight:700,marginBottom:10}}>💾 Save My Concert</div>
+            {myIdolData.length === 0 ? (
+              <div className="sans" style={{fontSize:11,color:"rgba(255,255,255,.4)",lineHeight:1.5}}>Follow a group above first, then save your show date here to unlock the Home countdown.</div>
+            ) : (
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                <select value={saveIdol || myIdols[0] || ""} onChange={e => setSaveIdol(e.target.value)} style={inputStyle}>
+                  {myIdolData.map(g => <option key={g.id} value={g.id} style={{color:"#000"}}>{g.emoji} {g.name}</option>)}
+                </select>
+                <input type="date" value={saveDate} onChange={e => setSaveDate(e.target.value)} style={inputStyle}/>
+                <div style={{display:"flex",gap:8}}>
+                  <input type="text" placeholder="City (optional)" value={saveCity} onChange={e => setSaveCity(e.target.value)} style={inputStyle}/>
+                  <input type="text" placeholder="Venue (optional)" value={saveVenue} onChange={e => setSaveVenue(e.target.value)} style={inputStyle}/>
+                </div>
+                <div style={{display:"flex",gap:8}}>
+                  <button className="tap" onClick={saveConcert} style={{flex:1,padding:"10px",borderRadius:12,border:"none",background:buyGradient,color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Space Mono'"}}>Save concert</button>
+                  {event && <button className="tap" onClick={clearSavedConcert} style={{padding:"10px 14px",borderRadius:12,border:"1px solid rgba(255,255,255,.12)",background:"rgba(255,255,255,.04)",color:"rgba(255,255,255,.6)",fontSize:11,cursor:"pointer",fontFamily:"'Space Mono'"}}>Clear</button>}
+                </div>
               </div>
-            );
-          })}
+            )}
+          </div>
         </div>
 
-        {event && (
-          <div className="fade" style={{padding:"0 20px 20px"}}>
+        {/* ── CONCERT KIT — always rendered & standalone (no saved concert required) ── */}
+        <div className="fade" style={{padding:"0 20px 20px"}}>
             <div style={{borderRadius:22,background:`linear-gradient(135deg,${idol?.color ?? "#7c3aed"}10,rgba(255,255,255,.02))`,border:`1px solid ${idol?.color ?? "#7c3aed"}28`,overflow:"hidden",marginBottom:14}}>
               <div style={{padding:"16px 16px 12px",borderBottom:"1px solid rgba(255,255,255,.06)"}}>
                 <Lbl style={{color:idol?.color}}>🎟 Concert Kit</Lbl>
-                <div style={{fontSize:15,fontWeight:700}}>{days} days · {event.artist} · {event.venue}</div>
-              </div>
-
-              <div style={{padding:"13px 16px",borderBottom:"1px solid rgba(255,255,255,.06)"}}>
-                <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:10}}>
-                  <div style={{fontSize:12,fontWeight:700}}>🎟 Get Tickets</div><AffTag/>
-                  {days != null && days <= 14 && <span style={{fontSize:9,padding:"2px 8px",borderRadius:18,background:"rgba(239,68,68,.12)",color:"#ef4444",fontFamily:"'Space Mono'"}}>⚡ {days}d left</span>}
-                </div>
-                <div style={{display:"flex",gap:7}}>
-                  {typeof vividUrl === "string" && /^https?:\/\//i.test(vividUrl) && (
-                  <a href={vividUrl} target="_blank" rel="noopener noreferrer" style={{flex:1}}>
-                    <button className="tap" style={{width:"100%",padding:"11px",borderRadius:13,border:"none",background:buyGradient,color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Space Mono'",boxShadow:`0 6px 20px ${THEME.accent}55`}}>
-                      Get Tickets · Vivid Seats ↗
-                    </button>
-                  </a>
-                  )}
-                  {typeof stubhubUrl === "string" && /^https?:\/\//i.test(stubhubUrl) && (
-                  <a href={stubhubUrl} target="_blank" rel="noopener noreferrer">
-                    <button className="tap" style={{padding:"11px 13px",borderRadius:13,border:`1px solid ${THEME.accent}40`,background:`${THEME.accent}14`,color:THEME.accent,fontSize:11,cursor:"pointer",fontFamily:"'Space Mono'",whiteSpace:"nowrap"}}>StubHub ↗</button>
-                  </a>
-                  )}
-                </div>
+                <div style={{fontSize:15,fontWeight:700}}>{event ? `${Math.max(days ?? 0, 0)} days · ${idol?.name ?? "Your show"}${eventWhere ? " · " + eventWhere : ""}` : "Your prep checklist"}</div>
               </div>
 
               <div style={{padding:"13px 16px",borderBottom:"1px solid rgba(255,255,255,.06)"}}>
@@ -957,41 +1028,46 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
               </div>
             </div>
             <div className="sans" style={{fontSize:10,color:"rgba(255,255,255,.18)",textAlign:"center"}}>Ticket & merch links are affiliate links · Prices may vary · {APP_NAME} earns a commission</div>
-          </div>
-        )}
+        </div>
       </div>
     );
   };
 
   // ── DROPS ─────────────────────────────────────────────────────────────────────
-  const renderDrops = () => (
+  const renderDrops = () => {
+    // Live: derived from each date every render, upcoming-soonest-first then recent,
+    // with >14d-past entries auto-expired by liveDrops().
+    const visible = liveDrops(DROPS);
+    return (
     <div style={{overflowY:"auto",paddingBottom:90}}>
       <div style={{padding:"52px 22px 16px"}}>
-        <Lbl>April – May 2026</Lbl>
+        <Lbl>Upcoming Releases</Lbl>
         <div className="h1" style={{fontSize:28}}>New Music<br/>Drops</div>
       </div>
       <div style={{padding:"0 20px",display:"flex",flexDirection:"column",gap:11,paddingBottom:24}}>
-        {DROPS.map((d, i) => {
+        {visible.length === 0 ? (
+          <div style={{borderRadius:18,background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.07)",padding:"28px 18px",textAlign:"center"}}>
+            <div style={{fontSize:14,fontWeight:700,marginBottom:6}}>No releases on the radar right now 🎵</div>
+            <div className="sans" style={{fontSize:11,color:"rgba(255,255,255,.4)",lineHeight:1.5}}>Check back soon — new comebacks get added as they're announced.</div>
+          </div>
+        ) : visible.map(({item: d, status}, i) => {
           const idol = d.idol ? getIdol(d.idol) : null;
-          const daysLeft = getDays(d.date);
-          const upcoming = daysLeft > 0;
           return (
             <div key={i} className="card fade" style={{animationDelay:`${i*.04}s`,overflow:"hidden"}}>
               <ColorBar color={idol?.color ?? "#6b7280"}/>
               <div style={{padding:"13px 13px 11px",display:"flex",gap:11,alignItems:"flex-start"}}>
                 <div style={{width:44,height:44,borderRadius:12,background:`${idol?.color ?? "#6b7280"}16`,border:`1px solid ${idol?.color ?? "#6b7280"}28`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
-                  {upcoming ? "📅" : daysLeft === 0 ? "🔴" : "🎵"}
+                  {status.days === 0 ? "🔴" : status.upcoming ? "📅" : "🎵"}
                 </div>
                 <div style={{flex:1}}>
                   <div style={{display:"flex",gap:7,alignItems:"center",marginBottom:3,flexWrap:"wrap"}}>
                     <span style={{fontSize:13,fontWeight:700}}>{d.title}</span>
-                    {daysLeft <= 0 && daysLeft > -2 && <span style={{fontSize:9,padding:"2px 8px",borderRadius:18,background:"rgba(239,68,68,.18)",color:"#ef4444",fontFamily:"'Space Mono'",fontWeight:700}}>NEW</span>}
+                    {!status.upcoming && status.label === "New" && <span style={{fontSize:9,padding:"2px 8px",borderRadius:18,background:"rgba(239,68,68,.18)",color:"#ef4444",fontFamily:"'Space Mono'",fontWeight:700}}>NEW</span>}
                   </div>
                   <div className="sans" style={{fontSize:11,color:"rgba(255,255,255,.38)",marginBottom:8}}>{d.artist} · {d.type} · {d.date}</div>
                   <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
-                    {!upcoming && d.ytUrl && <a href={d.ytUrl} target="_blank" rel="noopener noreferrer"><button className="tap pill" style={{background:"rgba(239,68,68,.1)",color:"#ef4444",border:"1px solid rgba(239,68,68,.2)",fontSize:10}}>▶ YouTube</button></a>}
-                    {!upcoming && <span style={{fontSize:10,padding:"3px 10px",borderRadius:18,background:`${idol?.color ?? "#6b7280"}12`,color:idol?.color ?? "rgba(255,255,255,.4)",fontFamily:"'Space Mono'"}}>{Math.abs(daysLeft) === 0 ? "Today" : `${Math.abs(daysLeft)}d ago`}</span>}
-                    {upcoming && <span className="sans" style={{fontSize:10,padding:"3px 10px",borderRadius:18,background:"rgba(255,255,255,.05)",color:"rgba(255,255,255,.33)"}}>Drops in {daysLeft} days</span>}
+                    {d.ytUrl && <a href={d.ytUrl} target="_blank" rel="noopener noreferrer"><button className="tap pill" style={{background:"rgba(239,68,68,.1)",color:"#ef4444",border:"1px solid rgba(239,68,68,.2)",fontSize:10}}>▶ YouTube</button></a>}
+                    <span style={{fontSize:10,padding:"3px 10px",borderRadius:18,background:status.upcoming ? "rgba(255,255,255,.05)" : `${idol?.color ?? "#6b7280"}12`,color:status.upcoming ? "rgba(255,255,255,.45)" : idol?.color ?? "rgba(255,255,255,.4)",fontFamily:"'Space Mono'"}}>{status.label}</span>
                     {idol && <IdolTag idol={idol}/>}
                   </div>
                 </div>
@@ -1001,7 +1077,8 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
         })}
       </div>
     </div>
-  );
+    );
+  };
 
   // ── STYLE AI ──────────────────────────────────────────────────────────────────
   const renderStyle = () => (
@@ -1342,48 +1419,139 @@ Return exactly 5 items. Focus on real, purchasable K-pop inspired fashion. Mix h
         )}
 
         {/* FANCHANTS */}
-        {fanSection === "fanchant" && (
-          <div style={{padding:"0 20px",display:"flex",flexDirection:"column",gap:11,paddingBottom:24}}>
+        {fanSection === "fanchant" && (() => {
+          const inputStyle: React.CSSProperties = {width:"100%",padding:"10px 12px",borderRadius:12,border:"1px solid rgba(255,255,255,.1)",background:"rgba(255,255,255,.04)",color:"#fff",fontSize:12,outline:"none",fontFamily:"'DM Sans',sans-serif"};
+          const visibleChants = showAllChants ? myChants : myChants.slice(0, 4);
+          const libGroups = Array.from(new Set(CHANT_LIBRARY.map(c => c.idol).filter((x): x is string => !!x)));
+          const libFiltered = chantLibGroup === "all" ? CHANT_LIBRARY : CHANT_LIBRARY.filter(c => c.idol === chantLibGroup);
+          return (
+          <div style={{padding:"0 20px",display:"flex",flexDirection:"column",gap:16,paddingBottom:24}}>
             <div style={{padding:"10px 14px",borderRadius:14,background:"rgba(124,58,237,.07)",border:"1px solid rgba(124,58,237,.18)"}}>
               <div className="sans" style={{fontSize:12,color:"rgba(255,255,255,.5)",lineHeight:1.65}}>💡 <strong style={{color:"#fff"}}>What is a fanchant?</strong> Scripted fan cheers tied to specific song moments. The whole crowd chants together — one of the most electric parts of any K-pop concert.</div>
             </div>
-            {FANCHANTS.map((fc, i) => {
-              const idol = getIdol(fc.idol);
-              const open = openFanchant === i;
-              return (
-                <div key={i} className="card fade" style={{animationDelay:`${i*.05}s`,overflow:"hidden"}}>
-                  <ColorBar color={idol?.color ?? "#7c3aed"}/>
-                  <div className="tap" onClick={() => setOpenFanchant(open ? null : i)} style={{padding:"13px 13px 11px",display:"flex",gap:11,alignItems:"center"}}>
-                    <div style={{width:46,height:46,borderRadius:13,background:`${idol?.color ?? "#7c3aed"}18`,border:`1px solid ${idol?.color ?? "#7c3aed"}28`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{idol?.emoji ?? "🎵"}</div>
-                    <div style={{flex:1}}>
-                      <div style={{fontSize:14,fontWeight:700,marginBottom:2}}>{fc.song}</div>
-                      <IdolTag idol={fc.idol}/>
-                    </div>
-                    <div style={{fontSize:19,color:"rgba(255,255,255,.18)",transition:"transform .3s",transform:open ? "rotate(90deg)" : "none"}}>›</div>
-                  </div>
-                  {open && (
-                    <div className="fade" style={{padding:"0 13px 14px",borderTop:"1px solid rgba(255,255,255,.06)"}}>
-                      <div className="sans" style={{fontSize:12,color:"rgba(255,255,255,.5)",lineHeight:1.65,marginBottom:12,marginTop:10}}>{fc.guide}</div>
-                      <div style={{display:"flex",flexDirection:"column",gap:7,marginBottom:12}}>
-                        {fc.lines.map((l, li) => (
-                          <div key={li} style={{borderRadius:12,background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.07)",padding:"10px 12px"}}>
-                            <div className="sans" style={{fontSize:11,color:"rgba(255,255,255,.38)",marginBottom:4,fontStyle:"italic"}}>"{l.lyric}"</div>
-                            <div style={{fontSize:12,fontWeight:700,color:idol?.color ?? "#c084fc",fontFamily:"'Space Mono'",marginBottom:3}}>{l.chant}</div>
-                            <div className="sans" style={{fontSize:10,color:"rgba(255,255,255,.28)"}}>{l.note}</div>
-                          </div>
-                        ))}
-                      </div>
-                      <a href={fc.ytUrl} target="_blank" rel="noopener noreferrer">
-                        <button className="tap" style={{width:"100%",padding:"10px",borderRadius:12,border:`1px solid ${idol?.color ?? "#7c3aed"}28`,background:`${idol?.color ?? "#7c3aed"}0e`,color:idol?.color ?? "#c084fc",fontSize:11,cursor:"pointer",fontFamily:"'Space Mono'"}}>▶ Full Fanchant Video on YouTube</button>
-                      </a>
-                    </div>
-                  )}
-                  {!open && <div style={{padding:"0 13px 12px"}}><button className="tap" onClick={() => setOpenFanchant(i)} style={{width:"100%",padding:"8px",borderRadius:12,border:`1px solid ${idol?.color ?? "#7c3aed"}22`,background:`${idol?.color ?? "#7c3aed"}08`,color:idol?.color ?? "#c084fc",fontSize:11,cursor:"pointer",fontFamily:"'Space Mono'"}}>See Fanchant Lines →</button></div>}
+
+            {/* ── MY CHANTS (first 4 + show-all expand) ── */}
+            <div>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                <Lbl style={{marginBottom:0}}>🎤 My Chants ({myChants.length})</Lbl>
+                {myChants.length > 4 && (
+                  <button className="tap mono" onClick={() => setShowAllChants(v => !v)} style={{padding:"5px 12px",borderRadius:18,border:"1px solid rgba(255,255,255,.12)",background:"rgba(255,255,255,.04)",color:"rgba(255,255,255,.6)",fontSize:10,fontWeight:700,cursor:"pointer"}}>{showAllChants ? "Show less" : `Show all (${myChants.length})`}</button>
+                )}
+              </div>
+              {myChants.length === 0 ? (
+                <div style={{borderRadius:16,background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.07)",padding:"22px 16px",textAlign:"center"}}>
+                  <div style={{fontSize:13,fontWeight:700,marginBottom:5}}>No saved chants yet 🎤</div>
+                  <div className="sans" style={{fontSize:11,color:"rgba(255,255,255,.4)",lineHeight:1.5}}>Add one from the library below, write your own, or generate one with FANI.</div>
                 </div>
-              );
-            })}
+              ) : (
+                <div style={{display:"flex",flexDirection:"column",gap:11}}>
+                  {visibleChants.map(fc => {
+                    const idol = fc.idol ? getIdol(fc.idol) : null;
+                    const color = idol?.color ?? "#7c3aed";
+                    const open = openChant === fc.id;
+                    return (
+                      <div key={fc.id} className="card" style={{overflow:"hidden"}}>
+                        <ColorBar color={color}/>
+                        <div className="tap" onClick={() => setOpenChant(open ? null : fc.id)} style={{padding:"13px 13px 11px",display:"flex",gap:11,alignItems:"center"}}>
+                          <div style={{width:46,height:46,borderRadius:13,background:`${color}18`,border:`1px solid ${color}28`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{idol?.emoji ?? "🎤"}</div>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontSize:14,fontWeight:700,marginBottom:2,display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+                              <span>{fc.song}</span>
+                              {fc.aiGenerated && <span style={{fontSize:8,padding:"2px 7px",borderRadius:18,background:"rgba(251,191,36,.16)",color:"#fbbf24",fontFamily:"'Space Mono'",fontWeight:700,letterSpacing:".04em"}}>AI</span>}
+                            </div>
+                            {fc.idol ? <IdolTag idol={fc.idol}/> : <span className="sans" style={{fontSize:10,color:"rgba(255,255,255,.4)"}}>{fc.artist}</span>}
+                          </div>
+                          <div style={{fontSize:19,color:"rgba(255,255,255,.18)",transition:"transform .3s",transform:open ? "rotate(90deg)" : "none"}}>›</div>
+                        </div>
+                        {open && (
+                          <div className="fade" style={{padding:"0 13px 14px",borderTop:"1px solid rgba(255,255,255,.06)"}}>
+                            {fc.aiGenerated && <div className="sans" style={{marginTop:10,marginBottom:10,fontSize:10,color:"#fbbf24",background:"rgba(251,191,36,.08)",border:"1px solid rgba(251,191,36,.2)",borderRadius:10,padding:"7px 10px",lineHeight:1.5}}>⚠️ AI-generated — verify before the show.</div>}
+                            {fc.guide && <div className="sans" style={{fontSize:12,color:"rgba(255,255,255,.5)",lineHeight:1.65,marginBottom:12,marginTop:fc.aiGenerated ? 0 : 10}}>{fc.guide}</div>}
+                            {fc.lines && fc.lines.length > 0 && (
+                              <div style={{display:"flex",flexDirection:"column",gap:7,marginBottom:12}}>
+                                {fc.lines.map((l, li) => (
+                                  <div key={li} style={{borderRadius:12,background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.07)",padding:"10px 12px"}}>
+                                    <div className="sans" style={{fontSize:11,color:"rgba(255,255,255,.38)",marginBottom:4,fontStyle:"italic"}}>"{l.lyric}"</div>
+                                    <div style={{fontSize:12,fontWeight:700,color:color,fontFamily:"'Space Mono'",marginBottom:3}}>{l.chant}</div>
+                                    <div className="sans" style={{fontSize:10,color:"rgba(255,255,255,.28)"}}>{l.note}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {fc.text && <div className="sans" style={{fontSize:12,color:"rgba(255,255,255,.62)",lineHeight:1.7,marginBottom:12,marginTop:(!fc.guide && !fc.aiGenerated) ? 10 : 0,whiteSpace:"pre-wrap"}}>{fc.text}</div>}
+                            {fc.ytUrl && (
+                              <a href={fc.ytUrl} target="_blank" rel="noopener noreferrer">
+                                <button className="tap" style={{width:"100%",padding:"10px",borderRadius:12,border:`1px solid ${color}28`,background:`${color}0e`,color:color,fontSize:11,cursor:"pointer",fontFamily:"'Space Mono'",marginBottom:8}}>▶ Fanchant Video on YouTube</button>
+                              </a>
+                            )}
+                            <button className="tap" onClick={() => removeChant(fc.id)} style={{width:"100%",padding:"9px",borderRadius:12,border:"1px solid rgba(239,68,68,.22)",background:"rgba(239,68,68,.08)",color:"#ef4444",fontSize:11,cursor:"pointer",fontFamily:"'Space Mono'"}}>Remove from My Chants</button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* ── GENERATE WITH FANI ── */}
+            <div className="card" style={{padding:"14px 15px"}}>
+              <div style={{display:"flex",gap:7,alignItems:"center",marginBottom:10}}>
+                <div style={{fontSize:13,fontWeight:700}}>✨ Generate with FANI</div>
+                <div style={{display:"flex",gap:4,alignItems:"center"}}><div className="live-dot"/><span style={{fontSize:9,color:"#ef4444",fontFamily:"'Space Mono'"}}>AI</span></div>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                <select value={chantGenGroup || myIdols[0] || ""} onChange={e => setChantGenGroup(e.target.value)} style={inputStyle}>
+                  {FULL_CATALOG.map(g => <option key={g.id} value={g.id} style={{color:"#000"}}>{g.emoji} {g.name}</option>)}
+                </select>
+                <input type="text" placeholder="Song (optional)" value={chantGenSong} onChange={e => setChantGenSong(e.target.value)} style={inputStyle}/>
+                <button className="tap" disabled={chantMode === "loading"} onClick={() => generateChant(chantGenGroup || myIdols[0] || "bts", chantGenSong)} style={{width:"100%",padding:"11px",borderRadius:12,border:"none",background:chantMode === "loading" ? "rgba(255,255,255,.08)" : heroGradient,color:"#fff",fontSize:12,fontWeight:700,cursor:chantMode === "loading" ? "default" : "pointer",fontFamily:"'Space Mono'",opacity:chantMode === "loading" ? .7 : 1}}>{chantMode === "loading" ? "Generating…" : "Generate chant"}</button>
+                <div className="sans" style={{fontSize:10,color:"rgba(255,255,255,.3)",textAlign:"center"}}>AI draft — always verify the chant before the show.</div>
+              </div>
+            </div>
+
+            {/* ── ADD CUSTOM CHANT ── */}
+            <div className="card" style={{padding:"14px 15px"}}>
+              <div style={{fontSize:13,fontWeight:700,marginBottom:10}}>➕ Add Custom Chant</div>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                <select value={chantFormGroup || myIdols[0] || ""} onChange={e => setChantFormGroup(e.target.value)} style={inputStyle}>
+                  {FULL_CATALOG.map(g => <option key={g.id} value={g.id} style={{color:"#000"}}>{g.emoji} {g.name}</option>)}
+                </select>
+                <input type="text" placeholder="Song title" value={chantFormSong} onChange={e => setChantFormSong(e.target.value)} style={inputStyle}/>
+                <textarea placeholder="Chant / lyrics — one line per cue" value={chantFormText} onChange={e => setChantFormText(e.target.value)} rows={4} style={{...inputStyle,resize:"vertical",lineHeight:1.5}}/>
+                <input type="text" placeholder="YouTube URL (optional)" value={chantFormYt} onChange={e => setChantFormYt(e.target.value)} style={inputStyle}/>
+                <button className="tap" onClick={addCustomChant} style={{width:"100%",padding:"11px",borderRadius:12,border:"none",background:buyGradient,color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Space Mono'"}}>Add chant</button>
+              </div>
+            </div>
+
+            {/* ── CHANT LIBRARY (browse + add/remove) ── */}
+            <div>
+              <Lbl>📚 Chant Library</Lbl>
+              <select value={chantLibGroup} onChange={e => setChantLibGroup(e.target.value)} style={{...inputStyle,marginBottom:10}}>
+                <option value="all" style={{color:"#000"}}>All groups</option>
+                {libGroups.map(gid => <option key={gid} value={gid} style={{color:"#000"}}>{getIdol(gid)?.emoji ?? "🎵"} {getIdol(gid)?.name ?? gid}</option>)}
+              </select>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {libFiltered.map(c => {
+                  const idol = c.idol ? getIdol(c.idol) : null;
+                  const color = idol?.color ?? "#7c3aed";
+                  const saved = isChantSaved(c.id);
+                  return (
+                    <div key={c.id} style={{borderRadius:14,background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.07)",padding:"11px 12px",display:"flex",gap:11,alignItems:"center"}}>
+                      <div style={{width:38,height:38,borderRadius:11,background:`${color}18`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0}}>{idol?.emoji ?? "🎵"}</div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:13,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{c.song}</div>
+                        <div className="sans" style={{fontSize:10,color:"rgba(255,255,255,.38)"}}>{c.artist}</div>
+                      </div>
+                      <button className="tap mono" onClick={() => toggleLibraryChant(c)} style={{flexShrink:0,padding:"7px 13px",borderRadius:18,border:`1px solid ${saved ? "rgba(255,255,255,.12)" : color+"66"}`,background:saved ? "rgba(255,255,255,.04)" : `${color}1e`,color:saved ? "rgba(255,255,255,.5)" : "#fff",fontSize:10,fontWeight:700,cursor:"pointer"}}>{saved ? "✓ Added" : "+ Add"}</button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
-        )}
+          );
+        })()}
 
         {/* MERCH */}
         {fanSection === "merch" && (
