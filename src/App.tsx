@@ -160,13 +160,14 @@ const IDOLS: Idol[] = [
 // Real upcoming comebacks (ISO `date`). `idol` resolves to a FULL_CATALOG id where the
 // group clearly exists, else null. ytUrl is a live YouTube search built from artist+title.
 const DROPS = [
-  {artist:"RYEOWOOK (Super Junior)",title:"Runaway",type:"Single",date:"2026-06-23",idol:"super-junior" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("RYEOWOOK Runaway")}` as string|null},
-  {artist:"ATEEZ",title:"GOLDEN HOUR : Part.5",type:"Album",date:"2026-06-26",idol:"ateez" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("ATEEZ GOLDEN HOUR : Part.5")}` as string|null},
-  {artist:"VERNON X THE8 (SEVENTEEN)",title:"V8",type:"Mini Album",date:"2026-06-29",idol:"svt" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("VERNON X THE8 V8")}` as string|null},
-  {artist:"ENHYPEN",title:"We'll Be Fine",type:"Single",date:"2026-06-29",idol:"enhypen" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("ENHYPEN We'll Be Fine")}` as string|null},
-  {artist:"Dreamcatcher (UAU)",title:"Playlist #Your Youth",type:"Mini Album",date:"2026-07-01",idol:"dreamcatcher" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("Dreamcatcher (UAU) Playlist #Your Youth")}` as string|null},
-  {artist:"i-dle",title:"We Made",type:"Mini Album",date:"2026-07-06",idol:"g-i-dle" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("i-dle We Made")}` as string|null},
-  {artist:"YEONJUN (TXT)",title:"NO LABELS: PART 02",type:"Mini Album",date:"2026-07-10",idol:"tomorrow-x-together" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("YEONJUN NO LABELS: PART 02")}` as string|null},
+  {artist:"Red Velvet",title:"Velvet Summer",type:"Mini Album",date:"2026-08-03",idol:"red-velvet" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("Red Velvet Velvet Summer")}` as string|null},
+  {artist:"Stray Kids",title:"THIS & THAT",type:"Mini Album",date:"2026-08-07",idol:"skz" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("Stray Kids THIS & THAT")}` as string|null},
+  {artist:"WayV",title:"Vision Wings",type:"Mini Album",date:"2026-08-10",idol:"wayv" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("WayV Vision Wings")}` as string|null},
+  {artist:"BIGBANG",title:"BiiiG",type:"Single",date:"2026-08-19",idol:"bigbang" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("BIGBANG BiiiG")}` as string|null},
+  {artist:"ENHYPEN",title:"THE SIN : BLISS",type:"Mini Album",date:"2026-08-21",idol:"enhypen" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("ENHYPEN THE SIN : BLISS")}` as string|null},
+  {artist:"NCT 127",title:"BLINGY",type:"Album",date:"2026-08-24",idol:"nct-127" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("NCT 127 BLINGY")}` as string|null},
+  {artist:"TAEMIN (SHINee)",title:"PHASE 1 : Soft Violence",type:"Album",date:"2026-08-31",idol:"shinee" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("TAEMIN PHASE 1 Soft Violence")}` as string|null},
+  {artist:"MONSTA X",title:"The Phase",type:"EP",date:"2026-09-04",idol:"monsta-x" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("MONSTA X The Phase")}` as string|null},
 ];
 
 // Curated, browsable fanchant catalog. Stable `lib-${idol}-${slug(song)}` ids let these
@@ -568,7 +569,7 @@ export default function FanDrop() {
         body: JSON.stringify({
           model: "claude-haiku-4-5-20251001",
           max_tokens: 1000,
-          system: `You are a knowledgeable, enthusiastic K-pop fan assistant named FANI. You know everything about K-pop — groups, members, songs, albums, concerts, photocards, fan culture, Korean idol industry, merchandise, fanchants, and fan communities. You're warm, relatable, and talk like a fellow fan. Keep responses concise (2–4 sentences max unless listing things). Use relevant emoji sparingly. You help fans solve real problems: finding merch, learning fanchants, understanding K-pop culture, planning concerts, budgeting for fan activities, and staying up to date on releases. Current date: May 2026.`,
+          system: `You are a knowledgeable, enthusiastic K-pop fan assistant named FANI. You know everything about K-pop — groups, members, songs, albums, concerts, photocards, fan culture, Korean idol industry, merchandise, fanchants, and fan communities. You're warm, relatable, and talk like a fellow fan. Keep responses concise (2–4 sentences max unless listing things). Use relevant emoji sparingly. You help fans solve real problems: finding merch, learning fanchants, understanding K-pop culture, planning concerts, budgeting for fan activities, and staying up to date on releases. Current date: ${new Date().toLocaleString("en-US", { month: "long", year: "numeric" })}.`,
           messages: hist,
         }),
       });
