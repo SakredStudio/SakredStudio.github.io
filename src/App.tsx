@@ -160,27 +160,13 @@ const IDOLS: Idol[] = [
 // Real upcoming comebacks (ISO `date`). `idol` resolves to a FULL_CATALOG id where the
 // group clearly exists, else null. ytUrl is a live YouTube search built from artist+title.
 const DROPS = [
-  {artist:"ENHYPEN",title:"The Sin: Bliss",type:"EP",date:"2026-08-21",idol:"enhypen" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("ENHYPEN The Sin Bliss")}` as string|null},
-  {artist:"NCT 127",title:"Blingy",type:"Album",date:"2026-08-24",idol:"nct-127" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("NCT 127 Blingy")}` as string|null},
-  {artist:"TWICE",title:"#BEST 2015-2025",type:"Best Album",date:"2026-08-26",idol:"twice" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("TWICE #BEST 2015-2025")}` as string|null},
-  {artist:"RIIZE",title:"Sunburst",type:"Japan Single",date:"2026-08-26",idol:"riize" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("RIIZE Sunburst")}` as string|null},
-  {artist:"SF9",title:"TENACITY",type:"Album",date:"2026-08-26",idol:"sf9" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("SF9 TENACITY")}` as string|null},
-  {artist:"JENNIE",title:"Fallen Angel",type:"EP",date:"2026-08-28",idol:"bp" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("JENNIE Fallen Angel")}` as string|null},
-  {artist:"TAEMIN (SHINee)",title:"PHASE 1 : Soft Violence",type:"Mini Album",date:"2026-08-31",idol:"shinee" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("TAEMIN PHASE 1 Soft Violence")}` as string|null},
-  {artist:"Girls' Generation-HRS",title:"Skibidi",type:"Digital Single",date:"2026-08-31",idol:"girls-generation" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("Girls Generation HRS Skibidi")}` as string|null},
-  {artist:"CHUNG HA",title:"México",type:"Digital Single",date:"2026-09-01",idol:null as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("CHUNG HA Mexico")}` as string|null},
-  {artist:"LISA",title:"SaWaDiKa",type:"Single",date:"2026-09-03",idol:"bp" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("LISA SaWaDiKa")}` as string|null},
-  {artist:"JISOO",title:"CLICK",type:"Single",date:"2026-09-04",idol:"bp" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("JISOO CLICK")}` as string|null},
-  {artist:"MONSTA X",title:"The Phase",type:"EP",date:"2026-09-04",idol:"monsta-x" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("MONSTA X The Phase")}` as string|null},
-  {artist:"MINHO (SHINee)",title:"Make It Hot",type:"Mini Album",date:"2026-09-07",idol:"shinee" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("MINHO Make It Hot")}` as string|null},
-  {artist:"SOYEON ((G)I-DLE)",title:"What a Wonderful Life",type:"Album",date:"2026-09-07",idol:"g-i-dle" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("SOYEON What a Wonderful Life")}` as string|null},
-  {artist:"D.O. (EXO)",title:"DOPAMINE",type:"Mini Album",date:"2026-09-08",idol:"exo" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("D.O. DOPAMINE")}` as string|null},
-  {artist:"LE SSERAFIM",title:"Made My Night",type:"Single Album",date:"2026-09-11",idol:"le-sserafim" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("LE SSERAFIM Made My Night")}` as string|null},
-  {artist:"PENTAGON",title:"Coward (겁쟁이)",type:"Digital Single",date:"2026-09-11",idol:"pentagon" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("PENTAGON Coward")}` as string|null},
-  {artist:"ONEW (SHINee)",title:"KAKERA -運命のピース-",type:"Japan Single",date:"2026-09-16",idol:"shinee" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("ONEW KAKERA")}` as string|null},
-  {artist:"BOYNEXTDOOR",title:"HOME (Repackage)",type:"Repackage",date:"2026-09-28",idol:"boynextdoor" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("BOYNEXTDOOR HOME")}` as string|null},
-  {artist:"tripleS",title:"ASSEMBLE26 <LOVE&POP> pt.2",type:"Album",date:"2026-10-20",idol:"triples" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("tripleS ASSEMBLE26 LOVE POP pt 2")}` as string|null},
+  {artist:"IVE",title:"Don't Leave Yet",type:"Single",date:"2026-10-19",idol:"ive" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("IVE Don't Leave Yet")}` as string|null},
+  {artist:"NMIXX",title:"Strange Muse",type:"EP",date:"2026-10-19",idol:"nmixx" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("NMIXX Strange Muse")}` as string|null},
   {artist:"LISA",title:"PRESS PLAY",type:"EP",date:"2026-10-23",idol:"bp" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("LISA PRESS PLAY")}` as string|null},
+  {artist:"IVE",title:"Looks Can Kill",type:"Mini Album",date:"2026-10-26",idol:"ive" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("IVE Looks Can Kill")}` as string|null},
+  {artist:"ILLIT",title:"BREAK EVEN",type:"Mini Album",date:"2026-10-26",idol:"illit" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("ILLIT BREAK EVEN")}` as string|null},
+  {artist:"TREASURE",title:"SHOCK",type:"Single",date:"2026-11-02",idol:"treasure" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("TREASURE SHOCK")}` as string|null},
+  {artist:"ATEEZ",title:"GOLDEN HOUR: Part.6",type:"Mini Album",date:"2026-11-13",idol:"ateez" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("ATEEZ GOLDEN HOUR Part.6")}` as string|null},
 ];
 
 // Curated, browsable fanchant catalog. Stable `lib-${idol}-${slug(song)}` ids let these
