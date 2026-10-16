@@ -21,3 +21,15 @@ export const concertSearchUrl = (group: string): string =>
 
 export const isHttpUrl = (u: unknown): u is string =>
   typeof u === "string" && /^https?:\/\//i.test(u);
+
+// Album pre-order / purchase search. Ktown4u is the pre-order shop fans already use (POB
+// photocards, group orders) and its search page answers 200 for `?keyword=`; YesStyle is
+// the fallback for the "Buy album" link on released titles. Both are in the Sovrn network.
+// Titles like "Looks Can Kill (pre-release)" or "Prologue Single (title TBA)" would poison a
+// shop search, so parentheticals are dropped and a TBA title falls back to the artist alone.
+const searchTerm = (artist: string, title: string): string =>
+  /tba/i.test(title) ? artist : `${artist} ${title.replace(/(.*?)/g, "")}`.replace(/s+/g, " ").trim();
+export const preorderUrl = (artist: string, title: string): string =>
+  `https://www.ktown4u.com/search?keyword=${encodeURIComponent(searchTerm(artist, title))}`;
+export const albumSearchUrl = (artist: string, title: string): string =>
+  `https://www.yesstyle.com/en/list.html?q=${encodeURIComponent(searchTerm(artist, title) + " album")}`;
