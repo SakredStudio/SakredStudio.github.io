@@ -8,6 +8,7 @@ export const KEYS = {
   chants: "fandrop_chants",
   savedEvent: "fandrop_savedEvent",
   customGroups: "fandrop_customGroups",
+  fancard: "swaiyu_fancard",
 } as const;
 
 // Writes never throw (private mode / blocked storage) — the in-memory state still updates.
@@ -56,6 +57,20 @@ export const loadSavedEvent = (): SavedConcert | null => {
       return v;
     }
     if (raw != null) remove(KEYS.savedEvent); // legacy id-pointer → drop
+    return null;
+  } catch { return null; }
+};
+
+// Fan Card fields (Step 4). `photo` is a downscaled JPEG data URL, so the whole record
+// stays well under localStorage limits.
+export interface FanCardRecord { name: string; bias: string; since: string; photo: string | null; }
+export const loadFanCard = (): FanCardRecord | null => {
+  try {
+    const raw: unknown = JSON.parse(localStorage.getItem(KEYS.fancard) || "null");
+    const v = raw as FanCardRecord;
+    if (v && typeof v === "object" && typeof v.name === "string" && typeof v.bias === "string") {
+      return { name: v.name, bias: v.bias, since: typeof v.since === "string" ? v.since : "2020", photo: typeof v.photo === "string" ? v.photo : null };
+    }
     return null;
   } catch { return null; }
 };

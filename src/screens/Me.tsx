@@ -1,9 +1,11 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { MERCH_SHOPS } from "../data/merch";
 import { GLOSSARY } from "../data/glossary";
 import { BUDGET_TIPS } from "../data/tips";
 import { APP_NAME, THEME } from "../theme";
 import { getIdol } from "../lib/groups";
+import { renderFanCard, shareFanCard, downscalePhoto, type CardFormat } from "../lib/fancard";
+import { track } from "../lib/beacon";
 import { Lbl, Disclosure, Header } from "../components/ui";
 import type { AppState } from "../state/useSwaiyu";
 
@@ -37,30 +39,30 @@ function FanCard({app}: {app: AppState}) {
   const { myIdolData, setShowPicker, fanName, setFanName, fanBias, setFanBias, fanSince, setFanSince, fanPhoto, setFanPhoto, pushToast, anchor, heroGradient } = app;
   const fileRef = useRef<HTMLInputElement>(null);
   const biasData = getIdol(fanBias);
+  const [busy, setBusy] = useState<CardFormat | null>(null);
 
-  const shareFanCard = async () => {
-    const fandoms = myIdolData.map(i => i.fandom).join(", ");
-    const text = `🎶 ${APP_NAME} Fan Card\n\n${fanName || "A K-pop fan"}\n${biasData ? `Ultimate bias: ${biasData.emoji} ${biasData.name}` : ""}\nFandoms: ${fandoms}\nStan since: ${fanSince}\n\nGet ${APP_NAME}: https://sakredstudio.github.io`;
+  // Render the card to a PNG and open the share sheet (or download where files can't be shared).
+  const share = async (format: CardFormat) => {
+    if (busy) return;
+    setBusy(format);
     try {
-      if (navigator.share) {
-        await navigator.share({title: `My ${APP_NAME} Fan Card`, text});
-      } else {
-        await navigator.clipboard.writeText(text);
-        pushToast("Fan Card copied to clipboard! 💜");
-      }
+      const blob = await renderFanCard({ name: fanName, bias: biasData, groups: myIdolData, since: fanSince, photo: fanPhoto, anchor }, format);
+      const outcome = await shareFanCard(blob, format);
+      if (outcome === "shared") { track("fancard_share"); pushToast("Shared! 💜"); }
+      else if (outcome === "downloaded") { track("fancard_download"); pushToast("Saved as a PNG 💜"); }
     } catch {
-      pushToast("Fan Card copied to clipboard! 💜");
+      pushToast("Couldn't make the card — try again");
     }
+    setBusy(null);
   };
 
   return (
     <Section title="🪪 Fan Card">
       <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={e => {
         const file = e.target.files?.[0];
+        e.target.value = "";
         if (!file) return;
-        const reader = new FileReader();
-        reader.onload = ev => setFanPhoto(ev.target?.result as string);
-        reader.readAsDataURL(file);
+        downscalePhoto(file).then(setFanPhoto).catch(() => pushToast("Couldn't read that photo"));
       }}/>
 
       <div className="fc-card" style={{background:`linear-gradient(135deg,${anchor}cc,#1a0a2e 60%,#0c0020)`,marginBottom:16,minHeight:220}}>
@@ -114,13 +116,17 @@ function FanCard({app}: {app: AppState}) {
       </div>
 
       <div style={{display:"flex",gap:9}}>
-        <button className="tap" onClick={shareFanCard} style={{flex:1,padding:"14px",borderRadius:14,border:"none",background:heroGradient,color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer"}}>
-          💜 Share Fan Card
+        <button className="tap" onClick={() => share("story")} disabled={!!busy} style={{flex:1,padding:"14px",minHeight:48,borderRadius:14,border:"none",background:busy ? "rgba(255,255,255,.1)" : heroGradient,color:"#fff",fontSize:14,fontWeight:700,cursor:busy ? "default" : "pointer"}}>
+          {busy === "story" ? "Making your card…" : "💜 Share to story"}
         </button>
-        <button className="tap" onClick={() => fileRef.current?.click()} style={{padding:"14px 16px",borderRadius:14,border:"1px solid rgba(255,255,255,.1)",background:"rgba(255,255,255,.04)",color:"rgba(255,255,255,.6)",fontSize:14,cursor:"pointer"}}>
+        <button className="tap" onClick={() => share("square")} disabled={!!busy} style={{padding:"14px 16px",minHeight:48,borderRadius:14,border:"1px solid rgba(255,255,255,.14)",background:"rgba(255,255,255,.05)",color:"#fff",fontSize:14,fontWeight:700,cursor:busy ? "default" : "pointer"}}>
+          {busy === "square" ? "…" : "Square"}
+        </button>
+        <button className="tap" onClick={() => fileRef.current?.click()} aria-label="Add photo" style={{padding:"14px 16px",minHeight:48,borderRadius:14,border:"1px solid rgba(255,255,255,.1)",background:"rgba(255,255,255,.04)",color:"rgba(255,255,255,.6)",fontSize:16,cursor:"pointer"}}>
           📸
         </button>
       </div>
+      <div style={{marginTop:10,fontSize:12,color:"rgba(255,255,255,.6)",textAlign:"center"}}>Story is 9:16 for Instagram and TikTok. Square fits a post or a group chat.</div>
     </Section>
   );
 }

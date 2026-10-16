@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { slugify } from "../kpopGroups";
 import { CUSTOM_PALETTE } from "../kpopGroups";
 import { type Idol } from "../data/idols";
@@ -6,7 +6,7 @@ import { CONCERT_KIT } from "../data/kit";
 import { type Chant } from "../data/chants";
 import { THEME } from "../theme";
 import { FULL_CATALOG, CATALOG_BY_ID, customRegistry, registerCustom, getIdol, loadCustomGroups } from "../lib/groups";
-import { KEYS, save, remove, has, loadIdols, loadChecked, loadChants, loadSavedEvent, type SavedConcert } from "../lib/storage";
+import { KEYS, save, remove, has, loadIdols, loadChecked, loadChants, loadSavedEvent, loadFanCard, type SavedConcert } from "../lib/storage";
 import { askWorker, FANI_SYSTEM, CHANT_SYSTEM, type ChatMessage } from "../lib/ai";
 
 export type TabId = "home" | "concerts" | "fani" | "me";
@@ -48,11 +48,15 @@ export function useSwaiyu() {
   const [aiMode, setAiMode] = useState<AiMode>("idle");
   const [aiMessages, setAiMessages] = useState<ChatMessage[]>([]);
   const [aiInput, setAiInput] = useState("");
-  // Fan Card
-  const [fanName, setFanName] = useState("");
-  const [fanBias, setFanBias] = useState(() => loadIdols()[0] ?? "bts");
-  const [fanSince, setFanSince] = useState("2020");
-  const [fanPhoto, setFanPhoto] = useState<string | null>(null);
+  // Fan Card — persisted as one record (swaiyu_fancard) so the card survives a reload.
+  const [fc] = useState(loadFanCard);
+  const [fanName, setFanName] = useState(fc?.name ?? "");
+  const [fanBias, setFanBias] = useState(fc?.bias ?? (loadIdols()[0] ?? "bts"));
+  const [fanSince, setFanSince] = useState(fc?.since ?? "2020");
+  const [fanPhoto, setFanPhoto] = useState<string | null>(fc?.photo ?? null);
+  useEffect(() => {
+    save(KEYS.fancard, { name: fanName, bias: fanBias, since: fanSince, photo: fanPhoto });
+  }, [fanName, fanBias, fanSince, fanPhoto]);
 
   const pushToast = useCallback((msg: string) => {
     const id = Date.now();
