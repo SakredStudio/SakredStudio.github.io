@@ -2,10 +2,12 @@ import { useState, useCallback, useEffect } from "react";
 import { slugify } from "../kpopGroups";
 import { CUSTOM_PALETTE } from "../kpopGroups";
 import { type Idol } from "../data/idols";
+import { DROPS, type Drop } from "../data/drops";
 import { CONCERT_KIT } from "../data/kit";
 import { type Chant } from "../data/chants";
 import { THEME, THEME_NAMES, type ThemeName } from "../theme";
 import { track } from "../lib/beacon";
+import { fetchDrops } from "../lib/drops";
 import { FULL_CATALOG, CATALOG_BY_ID, customRegistry, registerCustom, getIdol, loadCustomGroups } from "../lib/groups";
 import { KEYS, save, remove, has, loadIdols, loadChecked, loadChants, loadSavedEvent, loadFanCard, type SavedConcert } from "../lib/storage";
 import { askWorker, FANI_SYSTEM, CHANT_SYSTEM, type ChatMessage } from "../lib/ai";
@@ -18,6 +20,14 @@ export interface Toast { id: number; msg: string; }
 // Style AI was removed in v2 (ROADMAP.md §2.1); its state and handlers are gone.
 export function useSwaiyu() {
   const [tab, setTab] = useState<TabId>("home");
+  // Drops: start from the bundled copy, swap in public/drops.json once it arrives (B2).
+  // A failed/slow fetch (null) keeps the bundled list, so Home always has data.
+  const [drops, setDrops] = useState<Drop[]>(DROPS);
+  useEffect(() => {
+    let live = true;
+    fetchDrops().then(fresh => { if (live && fresh) setDrops(fresh); });
+    return () => { live = false; };
+  }, []);
   const [myIdols, setMyIdols] = useState<string[]>(loadIdols);
   const [customGroups, setCustomGroups] = useState<Idol[]>(loadCustomGroups);
   const [showPicker, setShowPicker] = useState(false);
@@ -226,6 +236,7 @@ export function useSwaiyu() {
 
   return {
     tab, setTab,
+    drops,
     myIdols, myIdolData, toggleIdol, customGroups, addCustomGroup,
     showPicker, setShowPicker, pickerSearch, setPickerSearch, customInput, setCustomInput,
     savedEvent, saveConcert, clearSavedConcert,

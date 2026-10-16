@@ -25,7 +25,7 @@ No env vars. All AI calls go through the Cloudflare Worker in `src/lib/ai.ts`
 | `src/state/useSwaiyu.ts` | every piece of state + handler; screens receive it as `app` |
 | `src/screens/{Home,Concerts,Fani,Me,Onboard}.tsx` | one file per tab |
 | `src/components/{Nav,Picker,ui}.tsx` | nav, group picker sheet, Lbl / IdolTag / ColorBar / Disclosure / Header |
-| `src/data/*.ts` | idols, drops, chants, kit, merch, glossary, tips (hand-maintained) |
+| `src/data/*.ts` | idols, chants, kit, merch, glossary, tips (hand-maintained); `drops.ts` validates and re-exports `public/drops.json` |
 | `src/lib/*.ts` | drops (live status), groups (resolver), storage, affiliate, ai |
 | `src/kpopGroups.ts` | the 100-group catalog (ids = `slugify(name)`) |
 | `src/theme.ts` | THEME tokens, global CSS, `inputStyle` |
@@ -35,7 +35,9 @@ Tabs: **Home** (hero, saved-concert countdown, drops) · **Concerts** (live tick
 Removed in v2: Style AI, the Home quick-action grid, per-link AFFILIATE badges (one `<Disclosure/>` per screen instead).
 
 ## Data upkeep
-`src/data/drops.ts` is the only thing that goes stale (entries auto-hide 14 days after release). Refresh ≈ monthly with a source per row; see ROADMAP.md. Everything else is static or a live deep-link.
+`public/drops.json` is the only thing that goes stale (entries auto-hide 14 days after release). Refresh ≈ monthly; see ROADMAP.md. Everything else is static or a live deep-link.
+
+**Drops refresh (for the scheduled task and for humans):** edit `public/drops.json` on `main`, not TSX. Merge, never replace: keep rows that still verify, drop rows you cannot source, add new ones. Every row needs `source` (the announcement URL on Korea Times, Soompi, sports.khan.co.kr, Korea Herald, Korea JoongAng Daily or kpopofficial.com), a real `date`, and an `idol` id the app knows or `null`. `yt` is an optional YouTube search hint. Bump `updated`. Run `npm run check:drops` before committing. No build is needed: the app fetches the JSON at runtime (3 s timeout, bundled copy as fallback) and the service worker serves it network-first.
 
 ## Persistence (localStorage, legacy `fandrop_` keys kept for existing installs)
 `fandrop_idols`, `fandrop_checkedItems`, `fandrop_chants`, `fandrop_savedEvent`, `fandrop_customGroups`. Onboarding shows once (skipped when `fandrop_idols` exists). See `src/lib/storage.ts`.

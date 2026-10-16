@@ -1,4 +1,4 @@
-import { DROPS, type Drop } from "../data/drops";
+import { type Drop } from "../data/drops";
 import { APP_NAME, ink } from "../theme";
 import { getIdol } from "../lib/groups";
 import { getDays, liveDrops, type DropStatus } from "../lib/drops";
@@ -14,8 +14,8 @@ type Live = { item: Drop; status: DropStatus };
 // group, or the saved concert if that is sooner), then every live release with a
 // Pre-order (upcoming) or Listen (released) button. Step 3 of BUILD-PLAN-V2.md.
 export function Home({app}: {app: AppState}) {
-  const { myIdols, myIdolData, savedEvent, setTab, setShowPicker, heroGradient } = app;
-  const all = liveDrops(DROPS);
+  const { drops, myIdols, myIdolData, savedEvent, setTab, setShowPicker, heroGradient } = app;
+  const all = liveDrops(drops);
   const nextDrop = all.find(x => x.status.upcoming && !!x.item.idol && myIdols.includes(x.item.idol)) ?? null;
   const concertDays = savedEvent ? getDays(savedEvent.date) : null;
   const concertLive = !!savedEvent && concertDays != null && concertDays >= 0;
