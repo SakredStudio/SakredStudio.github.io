@@ -28,7 +28,7 @@ export const isHttpUrl = (u: unknown): u is string =>
 // Titles like "Looks Can Kill (pre-release)" or "Prologue Single (title TBA)" would poison a
 // shop search, so parentheticals are dropped and a TBA title falls back to the artist alone.
 const searchTerm = (artist: string, title: string): string =>
-  /tba/i.test(title) ? artist : `${artist} ${title.replace(/(.*?)/g, "")}`.replace(/s+/g, " ").trim();
+  /tba/i.test(title) ? artist : `${artist} ${title.replace(/\(.*?\)/g, "")}`.replace(/\s+/g, " ").trim();
 export const preorderUrl = (artist: string, title: string): string =>
   `https://www.ktown4u.com/search?keyword=${encodeURIComponent(searchTerm(artist, title))}`;
 export const albumSearchUrl = (artist: string, title: string): string =>
