@@ -9,6 +9,7 @@ export const KEYS = {
   savedEvent: "fandrop_savedEvent",
   customGroups: "fandrop_customGroups",
   fancard: "swaiyu_fancard",
+  theme: "swaiyu_theme",
 } as const;
 
 // Writes never throw (private mode / blocked storage) — the in-memory state still updates.

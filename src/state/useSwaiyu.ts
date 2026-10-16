@@ -4,7 +4,8 @@ import { CUSTOM_PALETTE } from "../kpopGroups";
 import { type Idol } from "../data/idols";
 import { CONCERT_KIT } from "../data/kit";
 import { type Chant } from "../data/chants";
-import { THEME } from "../theme";
+import { THEME, THEME_NAMES, type ThemeName } from "../theme";
+import { track } from "../lib/beacon";
 import { FULL_CATALOG, CATALOG_BY_ID, customRegistry, registerCustom, getIdol, loadCustomGroups } from "../lib/groups";
 import { KEYS, save, remove, has, loadIdols, loadChecked, loadChants, loadSavedEvent, loadFanCard, type SavedConcert } from "../lib/storage";
 import { askWorker, FANI_SYSTEM, CHANT_SYSTEM, type ChatMessage } from "../lib/ai";
@@ -48,6 +49,17 @@ export function useSwaiyu() {
   const [aiMode, setAiMode] = useState<AiMode>("idle");
   const [aiMessages, setAiMessages] = useState<ChatMessage[]>([]);
   const [aiInput, setAiInput] = useState("");
+  // Theme (Step 6): night | pastel | bias, persisted under swaiyu_theme.
+  const [theme, setThemeState] = useState<ThemeName>(() => {
+    try { const v = localStorage.getItem(KEYS.theme) as ThemeName | null; return v && THEME_NAMES.includes(v) ? v : "night"; }
+    catch { return "night"; }
+  });
+  const setTheme = (name: ThemeName) => {
+    setThemeState(name);
+    try { localStorage.setItem(KEYS.theme, name); } catch { /* storage blocked */ }
+    track(`theme_set_${name}`);
+  };
+
   // Fan Card — persisted as one record (swaiyu_fancard) so the card survives a reload.
   const [fc] = useState(loadFanCard);
   const [fanName, setFanName] = useState(fc?.name ?? "");
@@ -229,6 +241,7 @@ export function useSwaiyu() {
     aiMode, aiMessages, aiInput, setAiInput, sendAiMessage,
     fanName, setFanName, fanBias, setFanBias, fanSince, setFanSince, fanPhoto, setFanPhoto,
     anchor, heroGradient, buyGradient,
+    theme, setTheme,
   };
 }
 
