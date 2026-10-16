@@ -4,6 +4,7 @@ import { getIdol } from "../lib/groups";
 import { getDays, liveDrops, type DropStatus } from "../lib/drops";
 import { preorderUrl, albumSearchUrl } from "../lib/affiliate";
 import { track } from "../lib/beacon";
+import { todaysBirthdays, upcomingBirthdays, formatMonthDay } from "../lib/birthdays";
 import { Lbl, IdolTag, ColorBar } from "../components/ui";
 import type { AppState } from "../state/useSwaiyu";
 
@@ -86,6 +87,8 @@ export function Home({app}: {app: AppState}) {
         </div>
       )}
 
+      <Birthdays myIdols={myIdols}/>
+
       {/* ── RELEASES ── */}
       <div style={{padding:"8px 22px 10px"}}><Lbl>📅 Releases</Lbl></div>
       <div style={{padding:"0 20px",display:"flex",flexDirection:"column",gap:11,paddingBottom:24}}>
@@ -95,6 +98,52 @@ export function Home({app}: {app: AppState}) {
             <div style={{fontSize:13,color:"rgba(255,255,255,.6)",lineHeight:1.5}}>Check back soon. New comebacks get added as they are announced.</div>
           </div>
         ) : all.map((live, i) => <DropCard key={dropId(live.item)} live={live} index={i} mine={!!live.item.idol && myIdols.includes(live.item.idol)}/>)}
+      </div>
+    </div>
+  );
+}
+
+// "Today 🎂" across the whole catalog (followed first) + the next three among followed groups.
+function Birthdays({myIdols}: {myIdols: string[]}) {
+  const today = todaysBirthdays(myIdols);
+  const next = upcomingBirthdays(myIdols, 3);
+  return (
+    <div style={{padding:"0 20px 14px"}}>
+      <div className="card fade" style={{padding:"14px 16px"}}>
+        <div style={{fontSize:14,fontWeight:700,marginBottom:10}}>🎂 Today</div>
+        {today.length === 0 ? (
+          <div style={{fontSize:13,color:"rgba(255,255,255,.6)"}}>No birthdays today</div>
+        ) : (
+          <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+            {today.map(b => {
+              const c = b.idol?.color ?? "#7c3aed";
+              return (
+                <span key={`${b.groupId}-${b.member}`} style={{display:"inline-flex",alignItems:"center",gap:6,padding:"8px 12px",minHeight:38,borderRadius:20,background:`${c}22`,border:`1px solid ${c}44`,fontSize:13,fontWeight:700,color:"#fff"}}>
+                  {b.idol?.emoji ?? "🎤"} {b.member}
+                  <span style={{color:"rgba(255,255,255,.65)",fontWeight:500}}>{b.idol?.name ?? b.groupId}</span>
+                </span>
+              );
+            })}
+          </div>
+        )}
+        {next.length > 0 && (
+          <>
+            <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,.7)",margin:"14px 0 4px"}}>Next up</div>
+            {next.map(b => {
+              const c = b.idol?.color ?? "#7c3aed";
+              return (
+                <div key={`${b.groupId}-${b.member}`} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 0",borderTop:"1px solid rgba(255,255,255,.06)"}}>
+                  <span style={{fontSize:20,width:28,textAlign:"center"}}>{b.idol?.emoji ?? "🎤"}</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:14,fontWeight:700}}>{b.member}</div>
+                    <div style={{fontSize:12,color:"rgba(255,255,255,.6)"}}>{b.idol?.name ?? b.groupId} · {formatMonthDay(b.date)}</div>
+                  </div>
+                  <span style={{fontSize:12,fontWeight:700,color:c,padding:"6px 10px",borderRadius:18,background:`${c}18`,whiteSpace:"nowrap"}}>{b.daysUntil === 1 ? "tomorrow" : `in ${b.daysUntil} days`}</span>
+                </div>
+              );
+            })}
+          </>
+        )}
       </div>
     </div>
   );

@@ -6,6 +6,7 @@ import { APP_NAME, THEME } from "../theme";
 import { getIdol } from "../lib/groups";
 import { renderFanCard, shareFanCard, downscalePhoto, type CardFormat } from "../lib/fancard";
 import { track } from "../lib/beacon";
+import { nextBirthdayFor, formatMonthDay } from "../lib/birthdays";
 import { Lbl, Disclosure, Header } from "../components/ui";
 import type { AppState } from "../state/useSwaiyu";
 
@@ -148,6 +149,7 @@ function MyGroups({app}: {app: AppState}) {
               <div style={{fontSize:24,marginBottom:6}}>{idol.emoji}</div>
               <div style={{fontSize:13,fontWeight:700,marginBottom:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{idol.name}</div>
               <div className="sans" style={{fontSize:12,color:"rgba(255,255,255,.6)",marginBottom:6}}>{idol.fandom}</div>
+              {(() => { const nb = nextBirthdayFor(idol.id); return nb ? <div style={{fontSize:12,color:"rgba(255,255,255,.6)",marginBottom:6,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>🎂 {nb.member} · {nb.daysUntil === 0 ? "today!" : formatMonthDay(nb.date)}</div> : null; })()}
               <div style={{width:"100%",height:2,borderRadius:1,background:idol.color}}/>
             </div>
           ))}
