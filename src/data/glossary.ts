@@ -1,0 +1,18 @@
+export const GLOSSARY = [
+  {t:"Bias",d:"Your absolute favourite member. Your #1."},
+  {t:"Bias Wrecker",d:"A member who keeps threatening to become your new #1."},
+  {t:"Comeback",d:"When a group releases new music after a break. Always a major event."},
+  {t:"Fanchant",d:"Scripted crowd cheers tied to specific song moments. Fans chant in unison."},
+  {t:"Stan",d:"An intensely dedicated fan. Also a verb: 'I stan BTS.'"},
+  {t:"Multistan",d:"A fan who actively follows multiple groups at once."},
+  {t:"OT (n)",d:"'One True (n) members.' e.g. 'OT7' = you stan all 7 BTS members equally."},
+  {t:"POB",d:"Pre-Order Benefit. Exclusive extras (photocards, posters) for pre-orders only."},
+  {t:"Lightstick",d:"Official fandom merch — Bluetooth glowing stick used at concerts. $50–$90."},
+  {t:"MV",d:"Music Video. K-pop MVs are cinematic productions on YouTube."},
+  {t:"Hiatus",d:"When an idol takes a break from activities, often for mandatory military service."},
+  {t:"Weverse",d:"HYBE's fan platform. Artists post here directly. Essential app for fans."},
+  {t:"Line Distribution",d:"How much each member sings in a song. Debated endlessly online."},
+  {t:"Sasaeng",d:"Extreme invasive fan who violates idols' privacy. Universally condemned."},
+  {t:"Daesang",d:"Korea's highest music award. Equivalent of Album/Artist of the Year."},
+  {t:"Disbandment",d:"When a group officially ends. One of the most dreaded events in fandom."},
+];
