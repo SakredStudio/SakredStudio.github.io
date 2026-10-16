@@ -26,16 +26,16 @@ Do the beacon setup first. Both Workers bind the same `database_id`.
 
 ## 2. `fandrop-worker/wrangler.toml` — add the D1 binding
 
-Append these lines (keep the existing `[[ratelimits]]` block and everything else as is).
-`database_id` is the id `wrangler d1 create swaiyu` printed; it is also in
-`worker/beacon/wrangler.toml` after step 3 of the beacon README.
+Append these lines (keep the existing `[[ratelimits]]` block named `RATE_LIMITER` and everything else as is).
+The `database_id` below is the real id of the `swaiyu` database (created 2026-10-16); it
+matches `worker/beacon/wrangler.toml`.
 
 ```toml
 # Shared D1 (same database as swaiyu-beacon). Holds counters(day, n) for the daily cap.
 [[d1_databases]]
 binding = "DB"
 database_name = "swaiyu"
-database_id = "<paste the id from `wrangler d1 create swaiyu`>"
+database_id = "74abedb6-5c46-4018-a026-a47639b806f2"
 
 [vars]
 DAILY_CAP = "2000"
@@ -43,57 +43,38 @@ DAILY_CAP = "2000"
 
 ## 3. `fandrop-worker/src/index.js` — complete replacement
 
-This keeps everything the current Worker does — origin allowlist, native Rate Limiting
-binding (`RL`), model allowlist, 1,024 `max_tokens` cap, `ANTHROPIC_API_KEY` secret — and
-adds the daily counter in front of the upstream call. **Before overwriting, diff it against
-the deployed copy**: if the live file has extra origins, models or headers, carry them into
-the constants at the top.
+This is the Worker code that was live on 2026-08-14 (read back from the deployed script)
+with one addition: `takeDailySlot()` and the `daily_cap` check between the body check and
+the upstream call. Origin allowlist, the `RATE_LIMITER` binding, the model allowlist
+(Haiku 4.5 + Sonnet 4.6, unknown → Haiku), the 1,024 `max_tokens` cap and the
+`ANTHROPIC_API_KEY` secret are untouched. Overwrite `src/index.js` with it.
 
 ```js
 // fandrop-ai — FANI proxy for https://sakredstudio.github.io
 // Browser → POST / {model, max_tokens, system, messages} → Anthropic Messages API.
-// Guards, in order: origin allowlist → per-IP rate limit → body + model allowlist →
-// DAILY GLOBAL CAP (D1) → max_tokens cap → upstream. The API key never leaves the Worker.
+// Guards, in order: origin allowlist → per-IP rate limit (RATE_LIMITER) → body check →
+// DAILY GLOBAL CAP (D1 `counters`) → model allowlist + max_tokens cap → upstream.
+// Everything except the cap is the code that was live on 2026-08-14, unchanged.
 
+const ALLOWED_MODELS = new Set([
+  "claude-haiku-4-5-20251001",
+  "claude-sonnet-4-6",
+]);
+const MAX_TOKENS_CAP = 1024;
 const ALLOWED_ORIGINS = new Set([
   "https://sakredstudio.github.io",
   "http://localhost:5173",
+  "http://localhost:3000",
   "http://127.0.0.1:5173",
-  "http://localhost:4173",
-  "http://127.0.0.1:4173",
 ]);
-
-const ALLOWED_MODELS = new Set([
-  "claude-haiku-4-5-20251001",   // what src/lib/ai.ts sends
-]);
-
-const MAX_TOKENS_CAP = 1024;
-const MAX_BODY_BYTES = 64 * 1024;   // a FANI conversation is far smaller than this
 const DEFAULT_DAILY_CAP = 2000;
-
-const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-const ANTHROPIC_VERSION = "2023-06-01";
-
-const corsHeaders = (origin) => ({
-  "Access-Control-Allow-Origin": origin,
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-  "Access-Control-Max-Age": "86400",
-  "Vary": "Origin",
-});
-
-const json = (body, status, cors) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...cors },
-  });
 
 const utcDay = () => new Date().toISOString().slice(0, 10);
 
-// Reserve one slot for today. Returns true when the request may be served, false when the
-// cap is reached. One D1 batch (insert-if-missing + conditional increment) so two requests
-// racing at the limit cannot both get through. If D1 itself is down we fail OPEN: a broken
-// counter must not take FANI down with it (the per-IP rate limit still applies).
+// Reserve one slot for today. true → serve; false → cap reached. One D1 batch (insert-if-
+// missing + conditional increment) so two requests racing at the limit cannot both pass.
+// If D1 itself is down we fail OPEN: a broken counter must not take FANI down with it
+// (the per-IP rate limit still applies).
 async function takeDailySlot(env) {
   if (!env.DB) return true;
   const cap = Number.parseInt(env.DAILY_CAP, 10) || DEFAULT_DAILY_CAP;
@@ -111,65 +92,79 @@ async function takeDailySlot(env) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const origin = request.headers.get("Origin") || "";
-    if (!ALLOWED_ORIGINS.has(origin)) return new Response("forbidden", { status: 403 });
-    const cors = corsHeaders(origin);
+    const originAllowed = ALLOWED_ORIGINS.has(origin);
 
-    if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
-    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, cors);
-
-    // Per-IP rate limit (native binding). The IP is used as a key only, never stored.
-    if (env.RL) {
-      const ip = request.headers.get("CF-Connecting-IP") || "unknown";
-      try {
-        const { success } = await env.RL.limit({ key: ip });
-        if (!success) return json({ error: "rate_limited" }, 429, cors);
-      } catch { /* limiter unavailable → continue */ }
+    if (request.method === "OPTIONS") {
+      if (!originAllowed) return new Response(null, { status: 403 });
+      return new Response(null, { status: 204, headers: cors(origin) });
     }
+    if (!originAllowed) {
+      return new Response(JSON.stringify({ error: "forbidden" }), {
+        status: 403,
+        headers: { "content-type": "application/json" },
+      });
+    }
+
+    const headers = cors(origin);
+    const json = (obj, status = 200) =>
+      new Response(JSON.stringify(obj), { status, headers: { "content-type": "application/json", ...headers } });
+
+    if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+
+    // Per-IP rate limit (native binding). The IP is a key only, never stored.
+    const ip = request.headers.get("cf-connecting-ip") || "unknown";
+    const { success } = await env.RATE_LIMITER.limit({ key: ip });
+    if (!success) return json({ error: "rate_limited" }, 429);
 
     let body;
     try {
-      const text = await request.text();
-      if (text.length > MAX_BODY_BYTES) return json({ error: "too_large" }, 413, cors);
-      body = JSON.parse(text);
+      body = await request.json();
     } catch {
-      return json({ error: "bad_json" }, 400, cors);
+      return json({ error: "Invalid JSON" }, 400);
     }
-    if (!body || typeof body !== "object" || !Array.isArray(body.messages)) {
-      return json({ error: "bad_request" }, 400, cors);
+    if (!Array.isArray(body.messages) || body.messages.length === 0) {
+      return json({ error: "messages required" }, 400);
     }
-    if (!ALLOWED_MODELS.has(body.model)) return json({ error: "model_not_allowed" }, 400, cors);
 
     // Daily global cap, taken only for a request that will actually reach upstream — the app
     // renders this exact body as "FANI is resting, back tomorrow 💜".
-    if (!(await takeDailySlot(env))) return json({ error: "daily_cap" }, 429, cors);
+    if (!(await takeDailySlot(env))) return json({ error: "daily_cap" }, 429);
 
-    const maxTokens = Number.isInteger(body.max_tokens) ? body.max_tokens : MAX_TOKENS_CAP;
-    const upstreamBody = {
-      model: body.model,
-      max_tokens: Math.max(1, Math.min(MAX_TOKENS_CAP, maxTokens)),
-      messages: body.messages,
-      ...(typeof body.system === "string" ? { system: body.system } : {}),
-    };
+    const model = ALLOWED_MODELS.has(body.model) ? body.model : "claude-haiku-4-5-20251001";
+    const max_tokens = Math.min(body.max_tokens || 1024, MAX_TOKENS_CAP);
+    const payload = { model, max_tokens, messages: body.messages };
+    if (body.system) payload.system = body.system;
 
-    const upstream = await fetch(ANTHROPIC_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": env.ANTHROPIC_API_KEY,
-        "anthropic-version": ANTHROPIC_VERSION,
-      },
-      body: JSON.stringify(upstreamBody),
-    });
-
-    // Pass the Messages API response through unchanged (the app reads content[].text).
-    return new Response(upstream.body, {
-      status: upstream.status,
-      headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...cors },
-    });
+    let upstream;
+    try {
+      upstream = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-api-key": env.ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch {
+      return json({ error: "Upstream request failed" }, 502);
+    }
+    const data = await upstream.text();
+    return new Response(data, { status: upstream.status, headers: { "content-type": "application/json", ...headers } });
   },
 };
+
+function cors(origin) {
+  return {
+    "access-control-allow-origin": origin,
+    "access-control-allow-methods": "POST, OPTIONS",
+    "access-control-allow-headers": "content-type",
+    "access-control-max-age": "86400",
+    "vary": "Origin",
+  };
+}
 ```
 
 ## 4. Owner commands
@@ -180,8 +175,9 @@ cd fandrop-worker          # the folder outside this repo that holds the FANI Wo
 # (if not already logged in from the beacon setup)
 npx wrangler login
 
-# Table already created by worker/beacon/README.md step 4. If you skipped that:
-npx wrangler d1 execute swaiyu --file ../SakredStudio.github.io/worker/beacon/schema.sql --remote
+# The counters table is created by worker/beacon/README.md step 4 (schema.sql has both
+# tables). If you skipped that, run it from the app repo's worker/beacon folder:
+#   npx wrangler d1 execute swaiyu --file schema.sql --remote
 
 # The API key secret is unchanged; only set it again if it was never set:
 # npx wrangler secret put ANTHROPIC_API_KEY

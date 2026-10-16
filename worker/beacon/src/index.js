@@ -77,10 +77,10 @@ async function handleEvent(request, env) {
   if (!ALLOWED_ORIGINS.has(origin)) return new Response("forbidden", { status: 403 });
   const cors = corsHeaders(origin);
 
-  if (env.RL) {
+  if (env.RATE_LIMITER) {
     const ip = request.headers.get("CF-Connecting-IP") || "unknown";   // used as a key only, never stored
     try {
-      const { success } = await env.RL.limit({ key: ip });
+      const { success } = await env.RATE_LIMITER.limit({ key: ip });
       if (!success) return new Response("rate limited", { status: 429, headers: cors });
     } catch { /* limiter unavailable → let the request through rather than drop data */ }
   }

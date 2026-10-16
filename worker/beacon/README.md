@@ -21,13 +21,13 @@ cd worker/beacon
 # 1. Log in once (opens the browser).
 npx wrangler login
 
-# 2. Create the D1 database. Copy the database_id the command prints.
-npx wrangler d1 create swaiyu
+# 2. Create the D1 database.  ✅ DONE 2026-10-16 — `swaiyu` exists
+#    (id 74abedb6-5c46-4018-a026-a47639b806f2). Only run this again if it was deleted:
+#    npx wrangler d1 create swaiyu
 
-# 3. Paste that id into wrangler.toml, replacing
-#    REPLACE_WITH_DATABASE_ID_FROM_wrangler_d1_create  (keep the quotes).
+# 3. Paste that id into wrangler.toml.  ✅ DONE — already in this folder's wrangler.toml.
 
-# 4. Create both tables (events for the beacon, counters for the FANI cap).
+# 4. Create both tables (events for the beacon, counters for the FANI cap). Idempotent.
 npx wrangler d1 execute swaiyu --file schema.sql --remote
 
 # 5. Set the key that protects GET /summary. Pick a long random string and keep it.
@@ -67,7 +67,7 @@ npx wrangler d1 execute swaiyu --remote --command "SELECT * FROM events ORDER BY
 
 | Route | Behaviour |
 |---|---|
-| `POST /e` | Origin must be `https://sakredstudio.github.io` or a localhost dev origin, else 403. Per-IP rate limit 60 / 60 s (429). Body is `{"event":"name"}` or a bare `name` (text/plain, so `navigator.sendBeacon` needs no preflight). `event` must be one of: `open`, `hero_tap`, `preorder_click`, `listen_click`, `fancard_share`, `fancard_download`, `theme_set_night`, `theme_set_pastel`, `theme_set_bias`, `fani_send`, `ticket_click` (else 400). Upserts `n + 1` keyed by UTC day + event + `request.cf.country`. Returns 204. |
+| `POST /e` | Origin must be `https://sakredstudio.github.io` or a localhost dev origin, else 403. Per-IP rate limit 60 / 60 s via the `RATE_LIMITER` binding (429). Body is `{"event":"name"}` or a bare `name` (text/plain, so `navigator.sendBeacon` needs no preflight). `event` must be one of: `open`, `hero_tap`, `preorder_click`, `listen_click`, `fancard_share`, `fancard_download`, `theme_set_night`, `theme_set_pastel`, `theme_set_bias`, `fani_send`, `ticket_click` (else 400). Upserts `n + 1` keyed by UTC day + event + `request.cf.country`. Returns 204. |
 | `GET /summary?key=…` | `key` must equal the `SUMMARY_KEY` secret (403 otherwise). Returns `{since, until, days, totals: {event: n}, rows: [{day, event, country, n}]}` for the last 30 days. |
 | anything else | 404 |
 
