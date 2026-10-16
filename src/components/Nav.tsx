@@ -15,7 +15,7 @@ export function Nav({tab, setTab, anchor}: {tab: TabId; setTab: (t: TabId) => vo
         return (
           <button key={t.id} className="tap" onClick={() => setTab(t.id)} style={{flex:1,background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"4px 0"}}>
             <div style={{fontSize:active ? 22 : 19,transition:"all .2s",filter:active ? `drop-shadow(0 0 7px ${anchor})` : "none"}}>{t.icon}</div>
-            <div style={{fontSize:11,fontWeight:700,color:active ? anchor : "rgba(255,255,255,.35)",fontFamily:"'DM Sans'",transition:"color .2s"}}>{t.label}</div>
+            <div style={{fontSize:12,fontWeight:700,color:active ? anchor : "rgba(255,255,255,.6)",transition:"color .2s"}}>{t.label}</div>
             {active && <div style={{width:3,height:3,borderRadius:"50%",background:anchor,boxShadow:`0 0 6px ${anchor}`}}/>}
           </button>
         );
