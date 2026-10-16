@@ -10,6 +10,11 @@ Why a hard cap: FANI is free for users and billed to the owner. 2,000 Haiku requ
 ≤1,024 output tokens is a few dollars a day at most; without the cap a single viral day or a
 scraper that finds the endpoint is an open-ended bill (ROADMAP.md §4).
 
+> **Shortcut:** the same code and config are checked in as a deployable folder at
+> `worker/fandrop-ai/` (`wrangler.toml` + `src/index.js`). `sh worker/deploy.sh` deploys both
+> Workers in one go. The sections below are the same change spelled out for applying to the
+> external `fandrop-worker` folder instead; use one or the other, not both.
+
 ## 1. Prerequisite — the D1 database and table already exist
 
 `worker/beacon/README.md` steps 2–4 create the `swaiyu` database and run `schema.sql`, which
