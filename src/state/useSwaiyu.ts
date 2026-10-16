@@ -10,7 +10,7 @@ import { track } from "../lib/beacon";
 import { fetchDrops } from "../lib/drops";
 import { FULL_CATALOG, CATALOG_BY_ID, customRegistry, registerCustom, getIdol, loadCustomGroups } from "../lib/groups";
 import { KEYS, save, remove, has, loadIdols, loadChecked, loadChants, loadSavedEvent, loadFanCard, type SavedConcert } from "../lib/storage";
-import { askWorker, FANI_SYSTEM, CHANT_SYSTEM, type ChatMessage } from "../lib/ai";
+import { askWorker, isFaniResting, FANI_RESTING_MSG, FANI_SYSTEM, CHANT_SYSTEM, type ChatMessage } from "../lib/ai";
 
 export type TabId = "home" | "concerts" | "fani" | "me";
 export type AiMode = "idle" | "loading" | "done";
@@ -197,8 +197,9 @@ export function useSwaiyu() {
       const hist: ChatMessage[] = [...aiMessages, {role: "user", content: userMsg}];
       const reply = (await askWorker(FANI_SYSTEM(), hist)) || "Sorry, I couldn't find an answer — try rephrasing! 💜";
       setAiMessages(m => [...m, {role: "assistant", content: reply}]);
-    } catch {
-      setAiMessages(m => [...m, {role: "assistant", content: "Oops, something went wrong. Check your connection and try again! 💜"}]);
+    } catch (e) {
+      const msg = isFaniResting(e) ? FANI_RESTING_MSG : "Oops, something went wrong. Check your connection and try again! 💜";
+      setAiMessages(m => [...m, {role: "assistant", content: msg}]);
     }
     setAiMode("done");
   };
@@ -226,8 +227,8 @@ export function useSwaiyu() {
       });
       setChantGenSong("");
       pushToast("✨ AI chant added — verify before the show");
-    } catch {
-      pushToast("Couldn't generate — try again!");
+    } catch (e) {
+      pushToast(isFaniResting(e) ? FANI_RESTING_MSG : "Couldn't generate — try again!");
     }
     setChantMode("idle");
   };

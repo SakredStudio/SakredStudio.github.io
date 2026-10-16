@@ -1,12 +1,22 @@
 // All AI calls go through the token-gated Cloudflare Worker (origin allowlist, per-IP
-// rate limit, model allowlist, 1024-token cap). No key ever ships in the bundle.
+// rate limit, daily global cap, model allowlist, 1024-token cap). No key ever ships in
+// the bundle.
 const WORKER_URL = "https://fandrop-ai.mihir86-mp.workers.dev";
 const MODEL = "claude-haiku-4-5-20251001";
 
 export interface ChatMessage { role: "user" | "assistant"; content: string; }
 
+// Thrown when the Worker answers 429 {"error":"daily_cap"} — the 2,000-requests-per-UTC-day
+// budget is spent (worker/fandrop-ai-daily-cap.patch.md). Screens show FANI_RESTING_MSG.
+export class FaniRestingError extends Error {
+  constructor() { super("daily_cap"); this.name = "FaniRestingError"; }
+}
+export const FANI_RESTING_MSG = "FANI is resting, back tomorrow 💜";
+export const isFaniResting = (e: unknown): e is FaniRestingError => e instanceof FaniRestingError;
+
 // Returns the first text block of the reply, or "" if the Worker answered with a
-// shape we don't recognise. Network / parse failures throw.
+// shape we don't recognise. Network / parse failures throw; the daily cap throws
+// FaniRestingError so callers can tell it apart from a plain outage.
 export async function askWorker(system: string, messages: ChatMessage[], maxTokens = 1000): Promise<string> {
   const res = await fetch(WORKER_URL, {
     method: "POST",
@@ -14,6 +24,7 @@ export async function askWorker(system: string, messages: ChatMessage[], maxToke
     body: JSON.stringify({ model: MODEL, max_tokens: maxTokens, system, messages }),
   });
   const data = await res.json();
+  if (res.status === 429 && data?.error === "daily_cap") throw new FaniRestingError();
   return data?.content?.find((b: { type: string }) => b.type === "text")?.text ?? "";
 }
 
