@@ -6,6 +6,7 @@ import { getDays } from "../lib/drops";
 import { concertSearchUrl, buildTicketSearchUrl, isHttpUrl } from "../lib/affiliate";
 import { Lbl, IdolTag, ColorBar, Disclosure, Header } from "../components/ui";
 import type { AppState } from "../state/useSwaiyu";
+import { track } from "../lib/beacon";
 
 // Concerts = live ticket links per group + save-my-show + prep checklist + fanchants.
 // (v1's Events tab plus the Fan Hub › Fanchants section.)
@@ -46,7 +47,7 @@ export function Concerts({app}: {app: AppState}) {
                     <div className="sans" style={{fontSize:12,color:"var(--t2)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{g.fandom}</div>
                   </div>
                 </div>
-                <a href={tmUrl} target="_blank" rel="noopener noreferrer">
+                <a href={tmUrl} target="_blank" rel="noopener noreferrer" onClick={() => track("ticket_click")}>
                   <button className="tap" style={{width:"100%",padding:"12px",borderRadius:12,border:"none",background:buyGradient,color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",boxShadow:`0 5px 16px ${THEME.accent}44`}}>Find tickets ↗</button>
                 </a>
                 {isHttpUrl(resaleUrl) && (

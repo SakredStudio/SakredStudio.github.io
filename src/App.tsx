@@ -8,14 +8,23 @@ import { Home } from "./screens/Home";
 import { Concerts } from "./screens/Concerts";
 import { Fani } from "./screens/Fani";
 import { Me } from "./screens/Me";
+import { track } from "./lib/beacon";
 
 /* ═══════════════════════════════════════════════════════
    SWAIYU v2 — 4-tab shell. State lives in state/useSwaiyu.ts,
    data in data/*, helpers in lib/*, screens in screens/*.
    Colors come from the active theme's CSS variables (theme.ts).
 ═══════════════════════════════════════════════════════ */
+// Module-level so React 18 StrictMode's double-invoked effects still count one open per load.
+let openTracked = false;
+
 export default function App() {
   const app = useSwaiyu();
+  useEffect(() => {
+    if (openTracked) return;
+    openTracked = true;
+    track("open");
+  }, []);
   const { tab, setTab, toasts, showOnboard, anchor, heroGradient, theme } = app;
 
   // Keep the Android status bar / TWA chrome in step with the theme.

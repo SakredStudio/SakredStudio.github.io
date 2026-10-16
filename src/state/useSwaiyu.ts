@@ -189,6 +189,7 @@ export function useSwaiyu() {
   const sendAiMessage = async (override?: string) => {
     const userMsg = (override ?? aiInput).trim();
     if (!userMsg || aiMode === "loading") return;
+    track("fani_send");
     setAiInput("");
     setAiMessages(m => [...m, {role: "user", content: userMsg}]);
     setAiMode("loading");
