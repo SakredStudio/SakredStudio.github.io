@@ -160,16 +160,12 @@ const IDOLS: Idol[] = [
 // Real upcoming comebacks (ISO `date`). `idol` resolves to a FULL_CATALOG id where the
 // group clearly exists, else null. ytUrl is a live YouTube search built from artist+title.
 const DROPS = [
-  {artist:"NCT WISH",title:"I SPY",type:"Mini Album",date:"2026-10-12",idol:"nct-wish" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("NCT WISH I SPY")}` as string|null},
-  {artist:"Xdinary Heroes",title:"IMPULSE",type:"Mini Album",date:"2026-10-12",idol:"xdinary-heroes" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("Xdinary Heroes IMPULSE")}` as string|null},
-  {artist:"PLAVE",title:"HYPERDRIVE",type:"Mini Album",date:"2026-10-12",idol:null as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("PLAVE HYPERDRIVE")}` as string|null},
-  {artist:"IVE",title:"Looks Can Kill (pre-release)",type:"Pre-release Single",date:"2026-10-19",idol:"ive" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("IVE Looks Can Kill")}` as string|null},
-  {artist:"NMIXX",title:"Strange Muse",type:"Mini Album",date:"2026-10-19",idol:"nmixx" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("NMIXX Strange Muse Birthday Wish")}` as string|null},
+  {artist:"NMIXX",title:"Strange Muse",type:"Mini Album",date:"2026-10-19",idol:"nmixx" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("NMIXX Strange Muse")}` as string|null},
+  {artist:"IVE",title:"Don't Leave Yet",type:"Single",date:"2026-10-19",idol:"ive" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("IVE Don't Leave Yet")}` as string|null},
   {artist:"LISA",title:"PRESS PLAY",type:"EP",date:"2026-10-23",idol:"bp" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("LISA PRESS PLAY")}` as string|null},
+  {artist:"BABYMONSTER",title:"DESERVE",type:"Single",date:"2026-10-23",idol:"babymonster" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("BABYMONSTER DESERVE")}` as string|null},
   {artist:"IVE",title:"Looks Can Kill",type:"Mini Album",date:"2026-10-26",idol:"ive" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("IVE Looks Can Kill")}` as string|null},
-  {artist:"ILLIT",title:"BREAK EVEN",type:"Mini Album",date:"2026-10-26",idol:"illit" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("ILLIT BREAK EVEN I Will Arrest You")}` as string|null},
-  {artist:"RIIZE",title:"Prologue Single (title TBA)",type:"Digital Single",date:"2026-10-26",idol:"riize" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("RIIZE new single 2026")}` as string|null},
-  {artist:"xikers",title:"ROUTE ZERO : The CALLING",type:"Mini Album",date:"2026-11-02",idol:"xikers" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("xikers ROUTE ZERO The CALLING")}` as string|null},
+  {artist:"ILLIT",title:"BREAK EVEN",type:"Mini Album",date:"2026-10-26",idol:"illit" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("ILLIT BREAK EVEN")}` as string|null},
   {artist:"ATEEZ",title:"GOLDEN HOUR: Part.6",type:"Mini Album",date:"2026-11-13",idol:"ateez" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("ATEEZ GOLDEN HOUR Part.6")}` as string|null},
   {artist:"TOMORROW X TOGETHER",title:"PERFECT STORM",type:"Mini Album",date:"2026-11-16",idol:"tomorrow-x-together" as string|null,ytUrl:`https://www.youtube.com/results?search_query=${encodeURIComponent("TXT PERFECT STORM")}` as string|null},
 ];
