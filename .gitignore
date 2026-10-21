@@ -4,3 +4,7 @@ dist
 .env
 .env.*
 .DS_Store
+
+# beacon summary key written by worker/deploy.mjs
+worker/beacon/.summary-key
+.wrangler/

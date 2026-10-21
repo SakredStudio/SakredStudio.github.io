@@ -1,0 +1,271 @@
+import { useRef, useState } from "react";
+import { MERCH_SHOPS } from "../data/merch";
+import { GLOSSARY } from "../data/glossary";
+import { BUDGET_TIPS } from "../data/tips";
+import { APP_NAME, THEME_NAMES, tokensFor, ink, type ThemeName } from "../theme";
+import { getIdol } from "../lib/groups";
+import { renderFanCard, shareFanCard, downscalePhoto, type CardFormat } from "../lib/fancard";
+import { track } from "../lib/beacon";
+import { nextBirthdayFor, formatMonthDay } from "../lib/birthdays";
+import { Lbl, Disclosure, Header } from "../components/ui";
+import type { AppState } from "../state/useSwaiyu";
+
+// Me = Fan Card, my groups, merch shops, budget tips, glossary (stacked), privacy.
+// Step 4 of BUILD-PLAN-V2.md turns the Fan Card into a shareable image.
+export function Me({app}: {app: AppState}) {
+  return (
+    <div style={{overflowY:"auto",paddingBottom:90}}>
+      <Header kicker="Your fan identity" title="Me"/>
+      <FanCard app={app}/>
+      <MyGroups app={app}/>
+      <ThemePicker app={app}/>
+      <Merch/>
+      <Budget/>
+      <Glossary app={app}/>
+      <Disclosure/>
+      <div style={{padding:"8px 20px 30px",textAlign:"center"}}>
+        <a href="/privacy.html" target="_blank" rel="noopener noreferrer" className="sans" style={{display:"inline-block",padding:12,fontSize:13,color:"var(--t2)",textDecoration:"underline"}}>Privacy Policy</a>
+        <div className="sans" style={{fontSize:13,color:"var(--t2)",marginTop:6}}>{APP_NAME} · Sakred Studio</div>
+      </div>
+    </div>
+  );
+}
+
+const Section = ({title, children}: {title: string; children: React.ReactNode}) =>
+  <div style={{padding:"0 20px 22px"}}>
+    <Lbl style={{marginBottom:10}}>{title}</Lbl>
+    {children}
+  </div>;
+
+function FanCard({app}: {app: AppState}) {
+  const { myIdolData, setShowPicker, fanName, setFanName, fanBias, setFanBias, fanSince, setFanSince, fanPhoto, setFanPhoto, pushToast, anchor, heroGradient } = app;
+  const fileRef = useRef<HTMLInputElement>(null);
+  const biasData = getIdol(fanBias);
+  const [busy, setBusy] = useState<CardFormat | null>(null);
+
+  // Render the card to a PNG and open the share sheet (or download where files can't be shared).
+  const share = async (format: CardFormat) => {
+    if (busy) return;
+    setBusy(format);
+    try {
+      const blob = await renderFanCard({ name: fanName, bias: biasData, groups: myIdolData, since: fanSince, photo: fanPhoto, anchor }, format);
+      const outcome = await shareFanCard(blob, format);
+      if (outcome === "shared") { track("fancard_share"); pushToast("Shared! 💜"); }
+      else if (outcome === "downloaded") { track("fancard_download"); pushToast("Saved as a PNG 💜"); }
+    } catch {
+      pushToast("Couldn't make the card — try again");
+    }
+    setBusy(null);
+  };
+
+  return (
+    <Section title="🪪 Fan Card">
+      <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={e => {
+        const file = e.target.files?.[0];
+        e.target.value = "";
+        if (!file) return;
+        downscalePhoto(file).then(setFanPhoto).catch(() => pushToast("Couldn't read that photo"));
+      }}/>
+
+      <div className="fc-card" style={{background:`linear-gradient(135deg,${anchor}cc,#1a0a2e 60%,#0c0020)`,marginBottom:16,minHeight:220}}>
+        <div style={{position:"absolute",inset:0,background:"radial-gradient(ellipse at 80% 20%,rgba(255,255,255,.05),transparent 60%)",pointerEvents:"none"}}/>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16,position:"relative"}}>
+          <div>
+            <div style={{fontSize:12,opacity:.75,marginBottom:4}}>{APP_NAME}</div>
+            <div className="h1" style={{fontSize:28,lineHeight:1.1}}>{fanName || "Your Name"}</div>
+          </div>
+          <div className="tap" onClick={() => fileRef.current?.click()} style={{width:56,height:56,borderRadius:16,background:"var(--surface2)",border:"1.5px dashed var(--border-strong)",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",flexShrink:0,cursor:"pointer"}}>
+            {fanPhoto ? <img src={fanPhoto} alt="fan" style={{width:"100%",height:"100%",objectFit:"cover"}}/> : <span style={{fontSize:22}}>📸</span>}
+          </div>
+        </div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12,position:"relative"}}>
+          {myIdolData.map(idol => (
+            <span key={idol.id} style={{fontSize:12,padding:"3px 9px",borderRadius:20,background:"var(--surface2)",fontWeight:700}}>{idol.emoji} {idol.fandom}</span>
+          ))}
+        </div>
+        <div style={{display:"flex",gap:16,position:"relative"}}>
+          <div>
+            <div style={{fontSize:12,opacity:.7,marginBottom:2}}>Ultimate Bias</div>
+            <div style={{fontSize:13,fontWeight:700}}>{biasData?.emoji} {biasData?.name}</div>
+          </div>
+          <div>
+            <div style={{fontSize:12,opacity:.7,marginBottom:2}}>Stan Since</div>
+            <div style={{fontSize:13,fontWeight:700}}>{fanSince}</div>
+          </div>
+        </div>
+      </div>
+
+      <Lbl style={{marginBottom:8}}>Your fan name</Lbl>
+      <div style={{borderRadius:12,background:"var(--surface)",border:"1px solid var(--border)",padding:"13px 14px",marginBottom:12}}>
+        <input value={fanName} onChange={e => setFanName(e.target.value)} placeholder="e.g. PurpleWave / BTS_Joonie" maxLength={28} style={{width:"100%",background:"none",border:"none",color:"var(--t1)",fontSize:14,outline:"none"}}/>
+      </div>
+
+      <Lbl style={{marginBottom:8}}>Ultimate bias group</Lbl>
+      <div className="hrow" style={{marginBottom:14,flexWrap:"wrap"}}>
+        {myIdolData.map(idol => (
+          <button key={idol.id} className="tap pill" onClick={() => setFanBias(idol.id)} style={{flexShrink:0,background:fanBias === idol.id ? `${idol.color}20` : "var(--surface)",color:fanBias === idol.id ? ink(idol.color) : "var(--t2)",border:`1px solid ${fanBias === idol.id ? idol.color+"44" : "var(--border)"}`}}>
+            {idol.emoji} {idol.name}
+          </button>
+        ))}
+        <button className="tap pill" onClick={() => setShowPicker(true)} style={{flexShrink:0,background:"var(--surface)",color:"var(--t2)",border:"1px solid var(--border)"}}>+ Groups</button>
+      </div>
+
+      <Lbl style={{marginBottom:8}}>Stan since</Lbl>
+      <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
+        {["2019","2020","2021","2022","2023","2024","2025","2026"].map(yr => (
+          <button key={yr} className="tap pill" onClick={() => setFanSince(yr)} style={{background:fanSince === yr ? "rgba(192,132,252,.2)" : "var(--surface)",color:fanSince === yr ? "var(--accent)" : "var(--t2)",border:`1px solid ${fanSince === yr ? "rgba(192,132,252,.4)" : "rgba(255,255,255,.07)"}`}}>{yr}</button>
+        ))}
+      </div>
+
+      <div style={{display:"flex",gap:9}}>
+        <button className="tap" onClick={() => share("story")} disabled={!!busy} style={{flex:1,padding:"14px",minHeight:48,borderRadius:14,border:"none",background:busy ? "var(--surface2)" : heroGradient,color:"var(--t1)",fontSize:14,fontWeight:700,cursor:busy ? "default" : "pointer"}}>
+          {busy === "story" ? "Making your card…" : "💜 Share to story"}
+        </button>
+        <button className="tap" onClick={() => share("square")} disabled={!!busy} style={{padding:"14px 16px",minHeight:48,borderRadius:14,border:"1px solid var(--border)",background:"var(--surface)",color:"var(--t1)",fontSize:14,fontWeight:700,cursor:busy ? "default" : "pointer"}}>
+          {busy === "square" ? "…" : "Square"}
+        </button>
+        <button className="tap" onClick={() => fileRef.current?.click()} aria-label="Add photo" style={{padding:"14px 16px",minHeight:48,borderRadius:14,border:"1px solid var(--border)",background:"var(--surface)",color:"var(--t2)",fontSize:16,cursor:"pointer"}}>
+          📸
+        </button>
+      </div>
+      <div style={{marginTop:10,fontSize:12,color:"var(--t2)",textAlign:"center"}}>Story is 9:16 for Instagram and TikTok. Square fits a post or a group chat.</div>
+    </Section>
+  );
+}
+
+function MyGroups({app}: {app: AppState}) {
+  const { myIdolData, toggleIdol, setShowPicker, pushToast, heroGradient } = app;
+  return (
+    <Section title={`⚙️ My Groups (${myIdolData.length})`}>
+      <div className="sans" style={{fontSize:13,color:"var(--t2)",lineHeight:1.7,marginBottom:12}}>Your feed, drops and fanchants are based on the groups you follow. Browse 100+ groups or add your own.</div>
+      <button className="tap" onClick={() => setShowPicker(true)} style={{width:"100%",padding:"14px",borderRadius:14,border:"none",background:heroGradient,color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",marginBottom:14}}>
+        🔍 Browse & Add Groups
+      </button>
+      {myIdolData.length > 0 ? (
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          {myIdolData.map(idol => (
+            <div key={idol.id} className="tap" onClick={() => { toggleIdol(idol.id); pushToast(`Removed ${idol.name}`); }}
+              style={{borderRadius:16,border:`1.5px solid ${idol.color}55`,background:`${idol.color}12`,padding:"14px 13px",transition:"all .2s",position:"relative"}}>
+              <div style={{position:"absolute",top:10,right:11,fontSize:14,color:"var(--t2)"}}>×</div>
+              <div style={{fontSize:24,marginBottom:6}}>{idol.emoji}</div>
+              <div style={{fontSize:13,fontWeight:700,marginBottom:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{idol.name}</div>
+              <div className="sans" style={{fontSize:12,color:"var(--t2)",marginBottom:6}}>{idol.fandom}</div>
+              {(() => { const nb = nextBirthdayFor(idol.id); return nb ? <div style={{fontSize:12,color:"var(--t2)",marginBottom:6,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>🎂 {nb.member} · {nb.daysUntil === 0 ? "today!" : formatMonthDay(nb.date)}</div> : null; })()}
+              <div style={{width:"100%",height:2,borderRadius:1,background:idol.color}}/>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="sans" style={{textAlign:"center",padding:"20px 0",fontSize:13,color:"var(--t2)"}}>No groups yet — tap "Browse & Add Groups" to start.</div>
+      )}
+    </Section>
+  );
+}
+
+function Merch() {
+  return (
+    <Section title="🛍 Merch Shops">
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {MERCH_SHOPS.map((s, i) => (
+          <a key={i} href={s.url} target="_blank" rel="noopener noreferrer">
+            <div className="card tap fade" style={{animationDelay:`${i*.04}s`,padding:"14px 15px"}}>
+              <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
+                <div style={{width:44,height:44,borderRadius:12,background:`${s.color}18`,border:`1px solid ${s.color}28`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>🛍</div>
+                <div style={{flex:1}}>
+                  <div style={{display:"flex",gap:7,alignItems:"center",marginBottom:3,flexWrap:"wrap"}}>
+                    <span style={{fontSize:16,fontWeight:700}}>{s.name}</span>
+                    <span style={{fontSize:12,padding:"2px 8px",borderRadius:18,background:`${s.color}18`,color:ink(s.color),fontWeight:700}}>{s.tag}</span>
+                  </div>
+                  <div className="sans" style={{fontSize:12,color:"var(--t2)",lineHeight:1.55,marginBottom:5}}>{s.desc}</div>
+                  <div style={{fontSize:12,color:"var(--good)"}}>{s.price}</div>
+                </div>
+                <div style={{fontSize:16,color:"var(--t2)"}}>↗</div>
+              </div>
+            </div>
+          </a>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
+function Budget() {
+  return (
+    <Section title="💰 Budget Tips">
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        <div style={{padding:"10px 14px",borderRadius:14,background:"rgba(34,197,94,.07)",border:"1px solid rgba(34,197,94,.18)"}}>
+          <div className="sans" style={{fontSize:13,color:"var(--t2)",lineHeight:1.65}}>💚 K-pop is expensive. Concerts, lightsticks, albums, photocards — it adds up fast. These tips from real fan communities help you take part without breaking the bank.</div>
+        </div>
+        {BUDGET_TIPS.map((t, i) => (
+          <div key={i} className="card fade" style={{animationDelay:`${i*.04}s`,padding:"14px 15px"}}>
+            <div style={{display:"flex",gap:11,alignItems:"flex-start"}}>
+              <div style={{width:40,height:40,borderRadius:11,background:"rgba(34,197,94,.1)",border:"1px solid rgba(34,197,94,.18)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>{t.icon}</div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:16,fontWeight:700,marginBottom:3}}>{t.tip}</div>
+                <div className="sans" style={{fontSize:12,color:"var(--t2)",lineHeight:1.55,marginBottom:7}}>{t.detail}</div>
+                <div style={{fontSize:12,padding:"3px 10px",borderRadius:18,display:"inline-block",background:"rgba(34,197,94,.1)",color:"var(--good)"}}>{t.save}</div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
+function Glossary({app}: {app: AppState}) {
+  const { glossSearch, setGlossSearch } = app;
+  const q = glossSearch.toLowerCase();
+  const hits = GLOSSARY.filter(g => !q || g.t.toLowerCase().includes(q) || g.d.toLowerCase().includes(q));
+  return (
+    <Section title="📖 K-Pop Glossary">
+      <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:14,padding:"13px 14px",display:"flex",gap:9,alignItems:"center",marginBottom:14}}>
+        <span style={{opacity:.4,fontSize:14}}>🔍</span>
+        <input value={glossSearch} onChange={e => setGlossSearch(e.target.value)} placeholder="Search K-pop terms…" style={{background:"none",border:"none",color:"var(--t1)",fontSize:14,flex:1,outline:"none"}}/>
+      </div>
+      {hits.map((g, i) => (
+        <div key={i} style={{padding:"11px 14px",borderRadius:13,background:"var(--surface)",border:"1px solid var(--border)",marginBottom:7}}>
+          <div style={{fontSize:14,fontWeight:700,color:"var(--accent)",marginBottom:3}}>{g.t}</div>
+          <div className="sans" style={{fontSize:13,color:"var(--t2)",lineHeight:1.55}}>{g.d}</div>
+        </div>
+      ))}
+      {hits.length === 0 && (
+        <div style={{textAlign:"center",padding:"32px 0",color:"var(--t2)"}}>
+          <div style={{fontSize:36,marginBottom:8}}>🔍</div>
+          <div className="sans">No terms found</div>
+        </div>
+      )}
+    </Section>
+  );
+}
+
+// ── THEME PICKER (Step 6): three swatches, persisted, previewed with the live anchor ──
+const THEME_LABELS: Record<ThemeName, {label: string; sub: string}> = {
+  night:  { label: "Night",  sub: "Concert dark" },
+  pastel: { label: "Pastel", sub: "Soft and light" },
+  bias:   { label: "Bias",   sub: "Your group's color" },
+};
+function ThemePicker({app}: {app: AppState}) {
+  const { theme, setTheme, anchor, pushToast } = app;
+  return (
+    <Section title="🎨 Theme">
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+        {THEME_NAMES.map(name => {
+          const t = tokensFor(name, anchor);
+          const on = theme === name;
+          return (
+            <button key={name} className="tap" onClick={() => { setTheme(name); pushToast(`${THEME_LABELS[name].label} theme on`); }}
+              style={{padding:"12px 10px",minHeight:96,borderRadius:16,border:`2px solid ${on ? anchor : "var(--border)"}`,background:"var(--surface)",color:"var(--t1)",cursor:"pointer",textAlign:"left"}}>
+              <div style={{height:34,borderRadius:10,background:t.bg,border:`1px solid ${t.borderStrong}`,marginBottom:8,display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
+                <span style={{width:10,height:10,borderRadius:5,background:anchor}}/>
+                <span style={{width:28,height:6,borderRadius:3,background:t.t1,opacity:.85}}/>
+              </div>
+              <div style={{fontSize:14,fontWeight:700}}>{THEME_LABELS[name].label}{on ? " ✓" : ""}</div>
+              <div style={{fontSize:12,color:"var(--t2)"}}>{THEME_LABELS[name].sub}</div>
+            </button>
+          );
+        })}
+      </div>
+    </Section>
+  );
+}

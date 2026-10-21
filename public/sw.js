@@ -1,4 +1,4 @@
-const CACHE_NAME = 'swaiyu-v1';
+const CACHE_NAME = 'swaiyu-v2';
 const ASSETS = ['/', '/index.html', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png', '/icon-512-maskable.png'];
 
 self.addEventListener('install', (e) => {
@@ -16,6 +16,15 @@ self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;                    // never touch POSTs (FANI/Worker)
   const url = new URL(e.request.url);
   if (url.origin !== self.location.origin) return;           // never touch cross-origin (Sovrn, retailers, Worker)
+  if (url.pathname === '/drops.json') {                     // drops: network-first so a JSON edit on main shows up without a rebuild
+    e.respondWith(
+      fetch(e.request).then((r) => {
+        if (r && r.status === 200) { const c = r.clone(); caches.open(CACHE_NAME).then((ch) => ch.put('/drops.json', c)); }
+        return r;
+      }).catch(() => caches.match('/drops.json').then((cached) => cached || Response.error()))
+    );
+    return;
+  }
   if (e.request.mode === 'navigate') {                       // HTML: network-first, offline-fallback to cached shell
     e.respondWith(
       fetch(e.request).then((r) => { const c = r.clone(); caches.open(CACHE_NAME).then((ch) => ch.put('/', c)); return r; })

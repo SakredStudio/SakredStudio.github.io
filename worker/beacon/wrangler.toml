@@ -1,0 +1,22 @@
+# swaiyu-beacon — anonymous usage counter (BUILD-PLAN-V2.md item B3).
+# Deploy from this folder: see README.md for the exact command sequence.
+name = "swaiyu-beacon"
+main = "src/index.js"
+compatibility_date = "2025-12-01"
+
+# D1: the same `swaiyu` database also holds the FANI daily-cap counter (B4).
+# database_id is the `swaiyu` database created 2026-10-16 (wrangler d1 create swaiyu).
+[[d1_databases]]
+binding = "DB"
+database_name = "swaiyu"
+database_id = "74abedb6-5c46-4018-a026-a47639b806f2"
+
+# Native Rate Limiting binding, 60 requests per 60 s per client IP (same shape as the
+# FANI worker, same binding name). namespace_id is any integer unique within the account.
+[[ratelimits]]
+name = "RATE_LIMITER"
+namespace_id = "2001"
+simple = { limit = 60, period = 60 }
+
+# Secrets (set with `wrangler secret put <NAME>`, never written here):
+#   SUMMARY_KEY — required by GET /summary?key=

@@ -1,0 +1,24 @@
+# fandrop-ai — FANI proxy, now deployable from this repo (replaces the external
+# fandrop-worker folder; keep only one of the two). `npx wrangler deploy` from here updates
+# the same Worker; the ANTHROPIC_API_KEY secret already on it is kept across deploys.
+name = "fandrop-ai"
+main = "src/index.js"
+compatibility_date = "2025-12-01"
+
+# Per-IP rate limit, same binding name the live Worker uses.
+[[ratelimits]]
+name = "RATE_LIMITER"
+namespace_id = "1001"
+simple = { limit = 60, period = 60 }
+
+# Shared D1 (same database as swaiyu-beacon). Holds counters(day, n) for the daily cap.
+[[d1_databases]]
+binding = "DB"
+database_name = "swaiyu"
+database_id = "74abedb6-5c46-4018-a026-a47639b806f2"
+
+[vars]
+DAILY_CAP = "2000"
+
+# Secrets (never written here):
+#   ANTHROPIC_API_KEY — already set on the deployed Worker; `wrangler secret put ANTHROPIC_API_KEY` only if missing
