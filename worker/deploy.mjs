@@ -16,7 +16,8 @@ const fani = join(here, "fandrop-ai");
 
 function wrangler(step, cwd, args, input) {
   console.log(`\n── ${step}\n   npx wrangler ${args.join(" ")}`);
-  const r = spawnSync("npx", ["--yes", "wrangler", ...args], {
+  // One command string (not an args array) with shell:true: works on Windows, no DEP0190 warning.
+  const r = spawnSync(`npx --yes wrangler ${args.join(" ")}`, {
     cwd, shell: true, input,
     stdio: input === undefined ? "inherit" : ["pipe", "inherit", "inherit"],
   });
