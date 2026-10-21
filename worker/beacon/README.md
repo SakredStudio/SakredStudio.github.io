@@ -10,6 +10,18 @@ The app already sends events to `https://swaiyu-beacon.mihir86-mp.workers.dev/e`
 (`src/lib/beacon.ts`) and never throws if the Worker is missing, so the app can ship before
 this is deployed; the counters just stay at zero until it is.
 
+## Fastest path — one command (PowerShell, cmd or bash)
+
+From the repo root, after `npx wrangler login` once:
+
+```sh
+npm run deploy:workers
+```
+
+It applies the schema, deploys this Worker, generates and sets `SUMMARY_KEY` (printed once and
+saved to `worker/beacon/.summary-key`, git-ignored), then deploys `worker/fandrop-ai/` with the
+daily cap. The manual steps below do the same thing one at a time.
+
 ## Owner commands — run from this folder, in this order
 
 Needs Node 18+ and a Cloudflare account (the one that owns `fandrop-ai`). `npx wrangler`

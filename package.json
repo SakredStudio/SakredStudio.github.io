@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "check:birthdays": "node scripts/check-birthdays.cjs",
-    "check:drops": "node scripts/check-drops.cjs"
+    "check:drops": "node scripts/check-drops.cjs",
+    "deploy:workers": "node worker/deploy.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

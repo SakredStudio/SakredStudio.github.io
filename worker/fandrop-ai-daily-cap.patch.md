@@ -11,7 +11,7 @@ Why a hard cap: FANI is free for users and billed to the owner. 2,000 Haiku requ
 scraper that finds the endpoint is an open-ended bill (ROADMAP.md §4).
 
 > **Shortcut:** the same code and config are checked in as a deployable folder at
-> `worker/fandrop-ai/` (`wrangler.toml` + `src/index.js`). `sh worker/deploy.sh` deploys both
+> `worker/fandrop-ai/` (`wrangler.toml` + `src/index.js`). `npm run deploy:workers` deploys both
 > Workers in one go. The sections below are the same change spelled out for applying to the
 > external `fandrop-worker` folder instead; use one or the other, not both.
 
