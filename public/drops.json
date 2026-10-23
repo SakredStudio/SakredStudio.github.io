@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-21",
+  "updated": "2026-10-23",
   "drops": [
     {"artist":"NCT WISH","title":"I SPY","type":"Mini Album","date":"2026-10-12","idol":"nct-wish","source":"https://www.soompi.com/article/1870160wpp/watch-nct-wish-announces-october-comeback-date-with-trailer-for-i-spy","yt":"NCT WISH I SPY"},
     {"artist":"Xdinary Heroes","title":"IMPULSE","type":"Mini Album","date":"2026-10-12","idol":"xdinary-heroes","source":"https://sports.khan.co.kr/en/article/202609211429007/","yt":"Xdinary Heroes IMPULSE"},
@@ -8,11 +8,22 @@
     {"artist":"NMIXX","title":"Strange Muse","type":"Mini Album","date":"2026-10-19","idol":"nmixx","source":"https://sports.khan.co.kr/en/article/202609220017007/","yt":"NMIXX Strange Muse Birthday Wish"},
     {"artist":"LISA","title":"PRESS PLAY","type":"EP","date":"2026-10-23","idol":"bp","source":"https://www.koreaherald.com/article/10885790","yt":"LISA PRESS PLAY"},
     {"artist":"BABYMONSTER","title":"DESERVE","type":"Digital Single","date":"2026-10-23","idol":"babymonster","source":"https://www.koreatimes.co.kr/entertainment/k-pop/20261014/babymonster-to-return-with-slow-tempo-single-deserve","yt":"BABYMONSTER DESERVE"},
+    {"artist":"ATEEZ","title":"Drip","type":"Pre-release Single","date":"2026-10-23","idol":"ateez","source":"https://www.soompi.com/article/1876093wpp/watch-ateez-announces-november-comeback-date-with-exciting-crash-to-begin-teaser","yt":"ATEEZ Drip"},
     {"artist":"IVE","title":"Looks Can Kill","type":"Mini Album","date":"2026-10-26","idol":"ive","source":"https://www.soompi.com/article/1873360wpp/ive-announces-comeback-date-for-new-ep-looks-can-kill","yt":"IVE Looks Can Kill"},
     {"artist":"ILLIT","title":"BREAK EVEN","type":"Mini Album","date":"2026-10-26","idol":"illit","source":"https://sports.khan.co.kr/en/article/202609150704007/","yt":"ILLIT BREAK EVEN I Will Arrest You"},
-    {"artist":"RIIZE","title":"Prologue Single (title TBA)","type":"Digital Single","date":"2026-10-26","idol":"riize","source":"https://www.koreaherald.com/article/10872651","yt":"RIIZE new single 2026"},
+    {"artist":"RIIZE","title":"Insomnia","type":"Digital Single","date":"2026-10-26","idol":"riize","source":"https://www.koreaherald.com/article/10907444","yt":"RIIZE Insomnia"},
+    {"artist":"AND2BLE","title":"Sequence 02: Attraction","type":"Mini Album","date":"2026-10-27","idol":null,"source":"https://sports.khan.co.kr/en/article/202610071531007/","yt":"AND2BLE French Kissing"},
     {"artist":"xikers","title":"ROUTE ZERO : The CALLING","type":"Mini Album","date":"2026-11-02","idol":"xikers","source":"https://www.soompi.com/article/1869586wpp/xikers-reveals-comeback-date-with-teaser-for-route-zero-the-calling","yt":"xikers ROUTE ZERO The CALLING"},
+    {"artist":"TREASURE","title":"SHOCK","type":"Digital Single","date":"2026-11-02","idol":"treasure","source":"https://www.soompi.com/article/1877872wpp/treasure-announces-november-comeback-date-and-details-for-shock","yt":"TREASURE SHOCK"},
+    {"artist":"TWS","title":"TO US","type":"Single","date":"2026-11-02","idol":"tws","source":"https://www.soompi.com/article/1875834wpp/watch-tws-announces-comeback-date-with-trailer-and-previews-for-to-us","yt":"TWS TO US"},
+    {"artist":"RESCENE","title":"PULSE","type":"Mini Album","date":"2026-11-03","idol":"rescene","source":"https://sports.khan.co.kr/en/article/202609220729007/","yt":"RESCENE PULSE"},
+    {"artist":"P1Harmony","title":"BLOW UP","type":"Mini Album","date":"2026-11-06","idol":"p1harmony","source":"https://www.soompi.com/article/1880133wpp/watch-p1harmony-announces-comeback-date-with-epic-final-mission-complete-trailer","yt":"P1Harmony BLOW UP"},
+    {"artist":"NCT DREAM","title":"DREAM AFTER DREAM","type":"Album","date":"2026-11-09","idol":"nct-dream","source":"https://www.soompi.com/article/1878731wpp/nct-dream-announces-comeback-date-with-dream-after-dream-teaser","yt":"NCT DREAM Boogie Woogie"},
+    {"artist":"CHAERYEONG","title":"Lovesick","type":"Mini Album","date":"2026-11-09","idol":"itzy","source":"https://www.koreatimes.co.kr/entertainment/k-pop/20261019/itzys-chaeryeong-to-make-solo-debut-with-mini-album-lovesick-on-nov-9","yt":"CHAERYEONG Lovesick"},
+    {"artist":"LNGSHOT","title":"S.W.I.S.H.","type":"EP","date":"2026-11-10","idol":null,"source":"https://sports.khan.co.kr/en/article/202610122000007/","yt":"LNGSHOT SWISH"},
+    {"artist":"KYUHYUN","title":"Continue","type":"EP","date":"2026-11-11","idol":"super-junior","source":"https://sports.khan.co.kr/en/article/202610201001007/","yt":"KYUHYUN Continue"},
     {"artist":"ATEEZ","title":"GOLDEN HOUR: Part.6","type":"Mini Album","date":"2026-11-13","idol":"ateez","source":"https://www.koreatimes.co.kr/entertainment/k-pop/20261008/boy-group-ateez-to-drop-new-ep-next-month","yt":"ATEEZ GOLDEN HOUR Part.6"},
+    {"artist":"H1-KEY","title":"Unbelievable","type":"Digital Single","date":"2026-11-13","idol":"h1-key","source":"https://www.soompi.com/article/1879499wpp/h1-key-announces-november-comeback-with-new-single-unbelievable","yt":"H1-KEY Unbelievable"},
     {"artist":"TOMORROW X TOGETHER","title":"PERFECT STORM","type":"Mini Album","date":"2026-11-16","idol":"tomorrow-x-together","source":"https://sports.khan.co.kr/en/article/202609282035007/","yt":"TXT PERFECT STORM"}
   ]
 }
