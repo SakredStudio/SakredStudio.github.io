@@ -55,7 +55,7 @@ const RAW: RawGroup[] = [
   { name: "TWS",                 fandom: "FAN",        emoji: "🐤", color: "#fbbf24", tier: "popular" }, // VERIFY
   { name: "KISS OF LIFE",        fandom: "KISSY",      emoji: "💋", color: "#f43f5e", tier: "popular" },
   { name: "TREASURE",            fandom: "Teume",      emoji: "💎", color: "#22d3ee", tier: "popular" },
-  { name: "STAYC",               fandom: "SWITH",      emoji: "🫧", color: "#f472b6", tier: "popular" },
+  { name: "STAYC",               fandom: "SWITH",      emoji: "🍭", color: "#f472b6", tier: "popular" },
 
   // ── MORE (boy groups) ──────────────────────────────────────────────────────
   { name: "WayV",            fandom: "WayZenNi",   emoji: "🌌", color: "#7c3aed", tier: "more" },
@@ -110,7 +110,7 @@ const RAW: RawGroup[] = [
   { name: "PURPLE KISS",     fandom: "FAN",        emoji: "💜", color: "#7c3aed", tier: "more" }, // VERIFY
   { name: "Weeekly",         fandom: "Daileee",    emoji: "📅", color: "#34d399", tier: "more" },
   { name: "H1-KEY",          fandom: "FAN",        emoji: "🔑", color: "#f59e0b", tier: "more" }, // VERIFY
-  { name: "FIFTY FIFTY",     fandom: "FAN",        emoji: "🪙", color: "#fb7185", tier: "more" }, // VERIFY
+  { name: "FIFTY FIFTY",     fandom: "FAN",        emoji: "🎀", color: "#fb7185", tier: "more" }, // VERIFY
   { name: "CSR",             fandom: "FAN",        emoji: "🌸", color: "#f472b6", tier: "more" }, // VERIFY
   { name: "UNIS",            fandom: "UNIVERSE",   emoji: "🌐", color: "#38bdf8", tier: "more" },
   { name: "RESCENE",         fandom: "FAN",        emoji: "🎬", color: "#ec4899", tier: "more" }, // VERIFY

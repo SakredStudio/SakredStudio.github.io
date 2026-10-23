@@ -59,7 +59,7 @@ function FanCard({app}: {app: AppState}) {
   };
 
   return (
-    <Section title="🪪 Fan Card">
+    <Section title="✨ Fan Card">
       <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={e => {
         const file = e.target.files?.[0];
         e.target.value = "";
