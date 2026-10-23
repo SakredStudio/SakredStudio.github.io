@@ -55,7 +55,7 @@ export function Fani({app}: {app: AppState}) {
           <div key={i} className="fade" style={{marginBottom:12,display:"flex",flexDirection:"column",alignItems:msg.role === "user" ? "flex-end" : "flex-start"}}>
             {msg.role === "assistant" && <div style={{fontSize:12,color:"var(--t2)",marginBottom:4}}>FANI 🤖</div>}
             <div style={{maxWidth:"85%",padding:"11px 14px",borderRadius:msg.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px",background:msg.role === "user" ? heroGradient : "var(--surface)",border:msg.role === "assistant" ? "1px solid var(--border)" : "none"}}>
-              <div className="sans" style={{fontSize:14,lineHeight:1.65,color:msg.role === "user" ? "#fff" : "var(--t1)",whiteSpace:"pre-wrap"}}>{msg.content}</div>
+              <div className="sans" style={{fontSize:14,lineHeight:1.65,color:msg.role === "user" ? "#fff" : "var(--t1)",whiteSpace:"pre-wrap"}}>{renderRich(msg.content)}</div>
             </div>
           </div>
         ))}
@@ -83,4 +83,13 @@ export function Fani({app}: {app: AppState}) {
       </div>
     </div>
   );
+}
+
+// FANI replies sometimes use markdown emphasis. Show **bold** as bold and drop stray single
+// asterisks instead of printing raw "**" characters.
+function renderRich(text: string): React.ReactNode[] {
+  return text.split(/(\*\*[^*\n]+\*\*)/g).map((part, i) =>
+    /^\*\*[^*\n]+\*\*$/.test(part)
+      ? <strong key={i}>{part.slice(2, -2)}</strong>
+      : part.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, "$1$2"));
 }
