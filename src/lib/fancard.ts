@@ -146,10 +146,10 @@ export async function renderFanCard(d: FanCardData, format: CardFormat): Promise
   const by = panelY + panelH - 150;
   ctx.fillStyle = "rgba(255,255,255,.7)"; ctx.font = `600 28px ${FONT}`;
   ctx.fillText("ULTIMATE BIAS", x, by);
-  ctx.fillText("STAN SINCE", x + 520, by);
+  if (d.since) ctx.fillText("STAN SINCE", x + 520, by);
   ctx.fillStyle = "#fff"; ctx.font = `800 44px ${FONT}`;
   ctx.fillText(d.bias ? `${d.bias.emoji} ${d.bias.name}` : "—", x, by + 62);
-  ctx.fillText(d.since, x + 520, by + 62);
+  if (d.since) ctx.fillText(d.since, x + 520, by + 62);
 
   // ── Watermark ──
   ctx.textAlign = "center";

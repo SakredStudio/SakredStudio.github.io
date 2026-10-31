@@ -70,7 +70,7 @@ export const loadFanCard = (): FanCardRecord | null => {
     const raw: unknown = JSON.parse(localStorage.getItem(KEYS.fancard) || "null");
     const v = raw as FanCardRecord;
     if (v && typeof v === "object" && typeof v.name === "string" && typeof v.bias === "string") {
-      return { name: v.name, bias: v.bias, since: typeof v.since === "string" ? v.since : "2020", photo: typeof v.photo === "string" ? v.photo : null };
+      return { name: v.name, bias: v.bias, since: typeof v.since === "string" ? v.since : "", photo: typeof v.photo === "string" ? v.photo : null };
     }
     return null;
   } catch { return null; }

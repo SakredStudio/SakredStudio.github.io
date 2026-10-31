@@ -74,7 +74,7 @@ export function useSwaiyu() {
   const [fc] = useState(loadFanCard);
   const [fanName, setFanName] = useState(fc?.name ?? "");
   const [fanBias, setFanBias] = useState(fc?.bias ?? (loadIdols()[0] ?? "bts"));
-  const [fanSince, setFanSince] = useState(fc?.since ?? "2020");
+  const [fanSince, setFanSince] = useState(fc?.since ?? "");
   const [fanPhoto, setFanPhoto] = useState<string | null>(fc?.photo ?? null);
   useEffect(() => {
     save(KEYS.fancard, { name: fanName, bias: fanBias, since: fanSince, photo: fanPhoto });

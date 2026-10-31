@@ -1,4 +1,9 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+// Every year from 2000 (earliest debut among the app's groups) to now, newest first.
+// Computed at load, so a new year appears on its own.
+const THIS_YEAR = new Date().getFullYear();
+const STAN_YEARS: string[] = Array.from({ length: THIS_YEAR - 1999 }, (_, i) => String(THIS_YEAR - i));
 import { MERCH_SHOPS } from "../data/merch";
 import { GLOSSARY } from "../data/glossary";
 import { BUDGET_TIPS } from "../data/tips";
@@ -42,6 +47,13 @@ function FanCard({app}: {app: AppState}) {
   const fileRef = useRef<HTMLInputElement>(null);
   const biasData = getIdol(fanBias);
   const [busy, setBusy] = useState<CardFormat | null>(null);
+  // Keep the chosen year visible in the scrolling row.
+  const yearRow = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const row = yearRow.current;
+    const el = fanSince && row ? row.querySelector<HTMLElement>(`[data-year="${fanSince}"]`) : null;
+    if (row && el) row.scrollLeft = el.offsetLeft - row.offsetLeft - 8;
+  }, [fanSince]);
 
   // Render the card to a PNG and open the share sheet (or download where files can't be shared).
   const share = async (format: CardFormat) => {
@@ -88,10 +100,10 @@ function FanCard({app}: {app: AppState}) {
             <div style={{fontSize:12,opacity:.7,marginBottom:2}}>Ultimate Bias</div>
             <div style={{fontSize:13,fontWeight:700}}>{biasData?.emoji} {biasData?.name}</div>
           </div>
-          <div>
+          {fanSince && <div>
             <div style={{fontSize:12,opacity:.7,marginBottom:2}}>Stan Since</div>
             <div style={{fontSize:13,fontWeight:700}}>{fanSince}</div>
-          </div>
+          </div>}
         </div>
       </div>
 
@@ -110,10 +122,10 @@ function FanCard({app}: {app: AppState}) {
         <button className="tap pill" onClick={() => setShowPicker(true)} style={{flexShrink:0,background:"var(--surface)",color:"var(--t2)",border:"1px solid var(--border)"}}>+ Groups</button>
       </div>
 
-      <Lbl style={{marginBottom:8}}>Stan since</Lbl>
-      <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
-        {["2019","2020","2021","2022","2023","2024","2025","2026"].map(yr => (
-          <button key={yr} className="tap pill" onClick={() => setFanSince(yr)} style={{background:fanSince === yr ? "rgba(192,132,252,.2)" : "var(--surface)",color:fanSince === yr ? "var(--accent)" : "var(--t2)",border:`1px solid ${fanSince === yr ? "rgba(192,132,252,.4)" : "rgba(255,255,255,.07)"}`}}>{yr}</button>
+      <Lbl style={{marginBottom:8}}>Stan since{fanSince ? "" : <span style={{fontWeight:500,color:"var(--t2)"}}> · pick a year</span>}</Lbl>
+      <div ref={yearRow} className="hrow" style={{gap:8,marginBottom:16,paddingBottom:4,scrollSnapType:"x proximity"}}>
+        {STAN_YEARS.map(yr => (
+          <button key={yr} data-year={yr} className="tap pill" onClick={() => setFanSince(fanSince === yr ? "" : yr)} style={{background:fanSince === yr ? "rgba(192,132,252,.2)" : "var(--surface)",color:fanSince === yr ? "var(--accent)" : "var(--t2)",flexShrink:0,scrollSnapAlign:"start",border:`1px solid ${fanSince === yr ? "rgba(192,132,252,.4)" : "var(--border)"}`}}>{yr}</button>
         ))}
       </div>
 
