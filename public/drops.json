@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-26",
+  "updated": "2026-11-02",
   "drops": [
     {"artist":"NCT WISH","title":"I SPY","type":"Mini Album","date":"2026-10-12","idol":"nct-wish","source":"https://www.soompi.com/article/1870160wpp/watch-nct-wish-announces-october-comeback-date-with-trailer-for-i-spy","yt":"NCT WISH I SPY"},
     {"artist":"Xdinary Heroes","title":"IMPULSE","type":"Mini Album","date":"2026-10-12","idol":"xdinary-heroes","source":"https://sports.khan.co.kr/en/article/202609211429007/","yt":"Xdinary Heroes IMPULSE"},
@@ -25,6 +25,9 @@
     {"artist":"KYUHYUN","title":"Continue","type":"EP","date":"2026-11-11","idol":"super-junior","source":"https://sports.khan.co.kr/en/article/202610201001007/","yt":"KYUHYUN Continue"},
     {"artist":"ATEEZ","title":"GOLDEN HOUR: Part.6","type":"Mini Album","date":"2026-11-13","idol":"ateez","source":"https://www.koreatimes.co.kr/entertainment/k-pop/20261008/boy-group-ateez-to-drop-new-ep-next-month","yt":"ATEEZ GOLDEN HOUR Part.6"},
     {"artist":"H1-KEY","title":"Unbelievable","type":"Digital Single","date":"2026-11-13","idol":"h1-key","source":"https://www.soompi.com/article/1879499wpp/h1-key-announces-november-comeback-with-new-single-unbelievable","yt":"H1-KEY Unbelievable"},
-    {"artist":"TOMORROW X TOGETHER","title":"PERFECT STORM","type":"Mini Album","date":"2026-11-16","idol":"tomorrow-x-together","source":"https://sports.khan.co.kr/en/article/202609282035007/","yt":"TXT PERFECT STORM"}
+    {"artist":"TOMORROW X TOGETHER","title":"PERFECT STORM","type":"Mini Album","date":"2026-11-16","idol":"tomorrow-x-together","source":"https://sports.khan.co.kr/en/article/202609282035007/","yt":"TXT PERFECT STORM"},
+    {"artist":"ENHYPEN","title":"THE SIN : PARALLEL WORLD","type":"Single","date":"2026-11-20","idol":"enhypen","source":"https://www.soompi.com/article/1881313wpp/enhypen-announces-november-comeback-with-spinoff-single-the-sin-parallel-world","yt":"ENHYPEN THE SIN PARALLEL WORLD"},
+    {"artist":"NAYEON","title":"NA-sty","type":"Single","date":"2026-11-20","idol":"twice","source":"https://www.koreatimes.co.kr/entertainment/k-pop/20261026/twices-nayeon-to-make-solo-comeback-with-na-sty-on-nov-20","yt":"NAYEON NA-sty"},
+    {"artist":"Stray Kids","title":"SUIATSU","type":"Mini Album","date":"2026-11-25","idol":"skz","source":"https://kpopofficial.com/kpop-comeback-schedule-november-2026/","yt":"Stray Kids SUIATSU"}
   ]
 }
