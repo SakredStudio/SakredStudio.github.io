@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-09",
+  "updated": "2026-11-16",
   "drops": [
     {"artist":"NCT WISH","title":"I SPY","type":"Mini Album","date":"2026-10-12","idol":"nct-wish","source":"https://www.soompi.com/article/1870160wpp/watch-nct-wish-announces-october-comeback-date-with-trailer-for-i-spy","yt":"NCT WISH I SPY"},
     {"artist":"Xdinary Heroes","title":"IMPULSE","type":"Mini Album","date":"2026-10-12","idol":"xdinary-heroes","source":"https://sports.khan.co.kr/en/article/202609211429007/","yt":"Xdinary Heroes IMPULSE"},
@@ -29,6 +29,8 @@
     {"artist":"ENHYPEN","title":"THE SIN : PARALLEL WORLD","type":"Single","date":"2026-11-20","idol":"enhypen","source":"https://www.soompi.com/article/1881313wpp/enhypen-announces-november-comeback-with-spinoff-single-the-sin-parallel-world","yt":"ENHYPEN THE SIN PARALLEL WORLD"},
     {"artist":"NAYEON","title":"NA-sty","type":"Single","date":"2026-11-20","idol":"twice","source":"https://www.koreatimes.co.kr/entertainment/k-pop/20261026/twices-nayeon-to-make-solo-comeback-with-na-sty-on-nov-20","yt":"NAYEON NA-sty"},
     {"artist":"Stray Kids","title":"SUIATSU","type":"Mini Album","date":"2026-11-25","idol":"skz","source":"https://kpopofficial.com/kpop-comeback-schedule-november-2026/","yt":"Stray Kids SUIATSU"},
-    {"artist":"WENDY","title":"Gleam Hour","type":"Mini Album","date":"2026-11-23","idol":"red-velvet","source":"https://www.soompi.com/article/1885066wpp/red-velvets-wendy-announces-november-comeback-with-schedule-for-gleam-hour","yt":"WENDY Gleam Hour"}
+    {"artist":"WENDY","title":"Gleam Hour","type":"Mini Album","date":"2026-11-23","idol":"red-velvet","source":"https://www.soompi.com/article/1885066wpp/red-velvets-wendy-announces-november-comeback-with-schedule-for-gleam-hour","yt":"WENDY Gleam Hour"},
+    {"artist":"TAEYEON","title":"Unspecial","type":"Album","date":"2026-11-30","idol":null,"source":"https://www.koreatimes.co.kr/entertainment/k-pop/20261109/taeyeon-to-release-4th-studio-album-unspecial-on-nov-30","yt":"TAEYEON Unspecial"},
+    {"artist":"EXO-KASE","title":"Waking Up The City","type":"Mini Album","date":"2026-12-01","idol":null,"source":"https://www.koreatimes.co.kr/entertainment/k-pop/20261111/exos-kai-sehun-to-debut-as-duo-exo-kase-on-dec-1","yt":"EXO-KASE Waking Up The City"}
   ]
 }
